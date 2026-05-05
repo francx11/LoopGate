@@ -16,8 +16,7 @@ export default function SetupScreen() {
     try {
       const res = await fetch(`${apiUrl.replace(/\/$/, '')}/health`)
       if (!res.ok) throw new Error()
-      const baseHost = apiUrl.replace('https://', '').replace('http://', '').split(':')[0]
-      const ws = wsUrl || `ws://${baseHost}:8765`
+      const ws = wsUrl || apiUrl.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://') + '/ws'
       localStorage.setItem('lg-api', apiUrl)
       localStorage.setItem('lg-ws', ws)
       setConfig({ apiUrl: apiUrl.replace(/\/$/, ''), wsUrl: ws })
@@ -56,7 +55,7 @@ export default function SetupScreen() {
             value={wsUrl}
             onChange={e => setWsUrl(e.target.value)}
           />
-          <span className={styles.hint}>Se auto-detecta si lo dejas vacío</span>
+          <span className={styles.hint}>Se auto-detecta desde la URL del servidor</span>
         </div>
 
         {error && <p className={styles.error}>{error}</p>}
