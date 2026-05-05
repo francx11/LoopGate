@@ -4,7 +4,6 @@ from typing import List
 
 class Settings(BaseSettings):
     PORT: int = 8000
-    WS_PORT: int = 8765
     SECRET_TOKEN: str = ""          # optional auth token
     CORS_ORIGINS: List[str] = ["*"]
     LOG_LEVEL: str = "info"

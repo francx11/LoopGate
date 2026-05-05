@@ -1,22 +1,23 @@
 """
 WebSocket connection manager.
-Handles broadcasting events to all connected clients.
+Handles broadcasting events to all connected FastAPI WebSocket clients.
 """
 
 import asyncio
 import json
 from typing import Set
-import websockets
+
+from fastapi import WebSocket
 
 
 class ConnectionManager:
     def __init__(self):
-        self._clients: Set = set()
+        self._clients: Set[WebSocket] = set()
 
-    def add(self, ws):
+    def add(self, ws: WebSocket):
         self._clients.add(ws)
 
-    def remove(self, ws):
+    def remove(self, ws: WebSocket):
         self._clients.discard(ws)
 
     @property
@@ -27,16 +28,12 @@ class ConnectionManager:
         if not self._clients:
             return
         message = json.dumps(event)
-        results = await asyncio.gather(
-            *[client.send(message) for client in self._clients],
-            return_exceptions=True,
-        )
-        # Remove dead connections
-        dead = {
-            client
-            for client, result in zip(self._clients, results)
-            if isinstance(result, Exception)
-        }
+        dead: Set[WebSocket] = set()
+        for client in list(self._clients):
+            try:
+                await client.send_text(message)
+            except Exception:
+                dead.add(client)
         for client in dead:
             self._clients.discard(client)
 
