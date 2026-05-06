@@ -30,6 +30,7 @@ export interface Task {
 interface Config {
   apiUrl: string
   wsUrl: string
+  token: string
 }
 
 interface AppState {

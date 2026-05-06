@@ -20,7 +20,7 @@ class LogLine(BaseModel):
 
 
 class Task(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     command: str
     description: str = ""
@@ -37,7 +37,7 @@ class Task(BaseModel):
 
 class CreateTaskRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
-    command: str = Field(..., min_length=1)
+    command: str = Field(..., min_length=1, max_length=8192)
     description: str = Field("", max_length=300)
 
 

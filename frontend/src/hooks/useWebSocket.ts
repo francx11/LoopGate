@@ -6,7 +6,10 @@ export function useWebSocket() {
 
   const connect = useCallback(() => {
     if (!config) return
-    const socket = new WebSocket(config.wsUrl)
+    const wsUrl = config.token
+      ? `${config.wsUrl}?token=${encodeURIComponent(config.token)}`
+      : config.wsUrl
+    const socket = new WebSocket(wsUrl)
 
     socket.onopen = () => setConnected(true)
 

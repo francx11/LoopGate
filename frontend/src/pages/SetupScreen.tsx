@@ -6,6 +6,7 @@ export default function SetupScreen() {
   const { setConfig } = useStore()
   const [apiUrl, setApiUrl] = useState(localStorage.getItem('lg-api') ?? '')
   const [wsUrl, setWsUrl] = useState(localStorage.getItem('lg-ws') ?? '')
+  const [token, setToken] = useState(localStorage.getItem('lg-token') ?? '')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -14,14 +15,18 @@ export default function SetupScreen() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`${apiUrl.replace(/\/$/, '')}/health`)
+      const base = apiUrl.replace(/\/$/, '')
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch(`${base}/health`, { headers })
       if (!res.ok) throw new Error()
-      const ws = wsUrl || apiUrl.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://') + '/ws'
-      localStorage.setItem('lg-api', apiUrl)
+      const ws = wsUrl || base.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://') + '/ws'
+      localStorage.setItem('lg-api', base)
       localStorage.setItem('lg-ws', ws)
-      setConfig({ apiUrl: apiUrl.replace(/\/$/, ''), wsUrl: ws })
+      localStorage.setItem('lg-token', token)
+      setConfig({ apiUrl: base, wsUrl: ws, token })
     } catch {
-      setError('No se pudo conectar. Verifica que el servidor está corriendo.')
+      setError('No se pudo conectar. Verifica la URL y el token.')
     }
     setLoading(false)
   }
@@ -39,7 +44,7 @@ export default function SetupScreen() {
           <label>URL del servidor</label>
           <input
             type="url"
-            placeholder="http://localhost:8000"
+            placeholder="http://100.x.x.x:8000"
             value={apiUrl}
             onChange={e => setApiUrl(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && connect()}
@@ -48,10 +53,23 @@ export default function SetupScreen() {
         </div>
 
         <div className={styles.group}>
+          <label>Token de acceso</label>
+          <input
+            type="password"
+            placeholder="SECRET_TOKEN del servidor"
+            value={token}
+            onChange={e => setToken(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && connect()}
+            autoComplete="current-password"
+          />
+          <span className={styles.hint}>Definido en SECRET_TOKEN del .env del servidor</span>
+        </div>
+
+        <div className={styles.group}>
           <label>WebSocket (opcional)</label>
           <input
             type="text"
-            placeholder="ws://localhost:8765"
+            placeholder="ws://100.x.x.x:8000/ws"
             value={wsUrl}
             onChange={e => setWsUrl(e.target.value)}
           />

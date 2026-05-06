@@ -9,11 +9,11 @@ export default function App() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    // Restore from previous session
     const api = localStorage.getItem('lg-api')
     const ws = localStorage.getItem('lg-ws')
+    const token = localStorage.getItem('lg-token') ?? ''
     if (api && ws) {
-      setConfig({ apiUrl: api, wsUrl: ws })
+      setConfig({ apiUrl: api, wsUrl: ws, token })
       setReady(true)
       return
     }
@@ -23,9 +23,10 @@ export default function App() {
       .then(() => {
         const origin = window.location.origin
         const wsOrigin = origin.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://')
-        const cfg = { apiUrl: origin, wsUrl: `${wsOrigin}/ws` }
+        const cfg = { apiUrl: origin, wsUrl: `${wsOrigin}/ws`, token }
         localStorage.setItem('lg-api', cfg.apiUrl)
         localStorage.setItem('lg-ws', cfg.wsUrl)
+        // Keep existing token; user can update it via SetupScreen if needed
         setConfig(cfg)
       })
       .catch(() => {})

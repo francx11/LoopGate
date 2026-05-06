@@ -4,10 +4,18 @@ function getBase() {
   return useStore.getState().config?.apiUrl ?? ''
 }
 
+function getToken() {
+  return useStore.getState().config?.token ?? ''
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const token = getToken()
   const res = await fetch(`${getBase()}/api/v1${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {

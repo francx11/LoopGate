@@ -6,7 +6,9 @@ from typing import List
 class Settings(BaseSettings):
     PORT: int = 8000
     SECRET_TOKEN: str = ""          # optional auth token
-    CORS_ORIGINS: List[str] = ["*"]
+    # Default: no cross-origin access (same-origin only via Tailscale/ngrok).
+    # Add specific origins here if you need CORS, e.g. ["https://abc.ngrok-free.app"]
+    CORS_ORIGINS: List[str] = []
     LOG_LEVEL: str = "info"
     PROJECTS_ROOT: str = str(Path.home() / "Documents" / "Projects")
 

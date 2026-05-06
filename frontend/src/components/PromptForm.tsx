@@ -28,6 +28,12 @@ export default function PromptForm({ onCreated }: { onCreated: () => void }) {
   const isCustom = selectedPath === '__custom__'
   const effectiveDir = isCustom ? customPath.trim() : selectedPath
 
+  // Windows paths cannot legally contain these characters.
+  // Removing them prevents shell breakout via the cd /d "..." argument.
+  function sanitizePath(p: string): string {
+    return p.replace(/['"<>|*?&;`$]/g, '').trim()
+  }
+
   async function submit() {
     const text = prompt.trim()
     if (!text) { setError('Escribe un prompt'); return }
@@ -35,14 +41,15 @@ export default function PromptForm({ onCreated }: { onCreated: () => void }) {
     setError('')
     try {
       const escapedPrompt = text.replace(/"/g, '\\"')
-      const command = effectiveDir
-        ? `cd /d "${effectiveDir}" && claude -p "${escapedPrompt}"`
-        : `claude -p "${escapedPrompt}"`
+      const safeDir = sanitizePath(effectiveDir)
+      const command = safeDir
+        ? `cd /d "${safeDir}" && claude --dangerously-skip-permissions -p "${escapedPrompt}"`
+        : `claude --dangerously-skip-permissions -p "${escapedPrompt}"`
 
-      if (effectiveDir) localStorage.setItem(DIR_KEY, selectedPath)
+      if (safeDir) localStorage.setItem(DIR_KEY, selectedPath)
 
-      const projectName = projects.find(p => p.path === effectiveDir)?.name
-        ?? effectiveDir.split(/[\\/]/).pop()
+      const projectName = projects.find(p => p.path === safeDir)?.name
+        ?? safeDir.split(/[\\/]/).pop()
         ?? ''
 
       await api.createTask({

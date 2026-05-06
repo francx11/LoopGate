@@ -3,10 +3,29 @@ Task execution service.
 Runs commands in subprocesses and streams output via WebSocket.
 """
 
+import os
 import subprocess
 import threading
 from datetime import datetime
 from pathlib import Path
+
+
+# Only expose OS-level variables to subprocesses — never secrets or tokens.
+_ENV_WHITELIST = {
+    "PATH", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "HOME",
+    "COMSPEC", "SystemRoot", "SystemDrive", "WINDIR", "OS",
+    "APPDATA", "LOCALAPPDATA", "USERNAME", "COMPUTERNAME",
+    "PROCESSOR_ARCHITECTURE", "TERM", "LANG", "LC_ALL",
+}
+
+
+def _build_env() -> dict:
+    env = {k: v for k, v in os.environ.items() if k in _ENV_WHITELIST}
+    npm_global = str(Path.home() / "AppData" / "Roaming" / "npm")
+    path = env.get("PATH", "")
+    if npm_global not in path:
+        env["PATH"] = npm_global + os.pathsep + path
+    return env
 
 from app.core.store import task_store
 from app.core.ws_manager import manager
@@ -35,6 +54,7 @@ def _run(task_id: str):
             stderr=subprocess.STDOUT,
             text=True,
             cwd=str(Path.home()),
+            env=_build_env(),
         )
 
         for raw_line in iter(process.stdout.readline, ""):
