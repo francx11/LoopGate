@@ -45,9 +45,16 @@ echo.
 
 :: Tailscale (prioritario — IP fija, sin tunel publico)
 set TS_IP=
+set TS_BIN=
 where tailscale > nul 2>&1
-if %errorlevel% == 0 (
-    for /f "delims=" %%i in ('tailscale ip -4 2^>nul') do set TS_IP=%%i
+if %errorlevel% == 0 ( set TS_BIN=tailscale )
+if not defined TS_BIN (
+    if exist "C:\Program Files\Tailscale\tailscale.exe" (
+        set "TS_BIN=C:\Program Files\Tailscale\tailscale.exe"
+    )
+)
+if defined TS_BIN (
+    for /f "delims=" %%i in ('"%TS_BIN%" ip -4 2^>nul') do set TS_IP=%%i
 )
 
 if defined TS_IP (
@@ -62,11 +69,11 @@ if defined TS_IP (
     goto :end
 )
 
-:: Tailscale instalado pero sin IP (no conectado)
-where tailscale > nul 2>&1
-if %errorlevel% == 0 (
-    echo  Tailscale instalado pero sin conexion activa.
-    echo  Abre Tailscale en el PC y en el movil y vuelve a intentarlo.
+:: Tailscale instalado pero sin IP (no conectado / NeedsLogin)
+if defined TS_BIN (
+    echo  Tailscale instalado pero sin sesion activa.
+    echo  Abre Tailscale en la bandeja del sistema e inicia sesion,
+    echo  o ejecuta: "%TS_BIN%" login
     echo.
     echo  Acceso local: http://localhost:8000
     goto :end
