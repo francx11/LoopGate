@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useStore } from '../store'
 import TaskList from '../components/TaskList'
 import NewTaskForm from '../components/NewTaskForm'
+import PromptForm from '../components/PromptForm'
 import LogPanel from '../components/LogPanel'
 import styles from './Dashboard.module.css'
 
-type Tab = 'tasks' | 'new'
+type Tab = 'tasks' | 'claude' | 'new'
 
 export default function Dashboard() {
   const { connected, tasks, disconnect } = useStore()
@@ -38,6 +39,12 @@ export default function Dashboard() {
           {pendingCount > 0 && <span className={styles.tabBadge}>{pendingCount}</span>}
         </button>
         <button
+          className={`${styles.tab} ${tab === 'claude' ? styles.active : ''}`}
+          onClick={() => setTab('claude')}
+        >
+          🤖 Claude
+        </button>
+        <button
           className={`${styles.tab} ${tab === 'new' ? styles.active : ''}`}
           onClick={() => setTab('new')}
         >
@@ -47,6 +54,7 @@ export default function Dashboard() {
 
       <main className={styles.content}>
         {tab === 'tasks' && <TaskList onOpenLog={setLogTaskId} />}
+        {tab === 'claude' && <PromptForm onCreated={() => setTab('tasks')} />}
         {tab === 'new' && <NewTaskForm onCreated={() => setTab('tasks')} />}
       </main>
 
