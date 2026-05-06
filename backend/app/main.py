@@ -19,13 +19,13 @@ FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "di
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print(f"🚀 Loopgate starting on http://0.0.0.0:{settings.PORT}")
+    print(f"Loopgate starting on http://0.0.0.0:{settings.PORT}")
     if FRONTEND_DIST.exists():
-        print(f"📦 Serving frontend from {FRONTEND_DIST}")
+        print(f"Serving frontend from {FRONTEND_DIST}")
     else:
-        print(f"⚠️  Frontend not built — run 'npm run build' in frontend/")
+        print("Frontend not built -- run 'npm run build' in frontend/")
     yield
-    print("🛑 Loopgate server shutting down")
+    print("Loopgate server shutting down")
 
 
 app = FastAPI(

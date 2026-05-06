@@ -9,7 +9,7 @@ import uvicorn
 from app.core.config import settings
 
 if __name__ == "__main__":
-    print(f"🚀 Loopgate starting on http://0.0.0.0:{settings.PORT}")
+    print(f"Loopgate starting on http://0.0.0.0:{settings.PORT}")
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
