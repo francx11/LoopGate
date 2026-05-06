@@ -1,3 +1,4 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -7,6 +8,7 @@ class Settings(BaseSettings):
     SECRET_TOKEN: str = ""          # optional auth token
     CORS_ORIGINS: List[str] = ["*"]
     LOG_LEVEL: str = "info"
+    PROJECTS_ROOT: str = str(Path.home() / "Documents" / "Projects")
 
     class Config:
         env_file = ".env"

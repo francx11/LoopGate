@@ -1,14 +1,32 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../services/api'
 import styles from './PromptForm.module.css'
 
 const DIR_KEY = 'lg-last-dir'
 
+interface Project { name: string; path: string }
+
 export default function PromptForm({ onCreated }: { onCreated: () => void }) {
   const [prompt, setPrompt] = useState('')
-  const [dir, setDir] = useState(() => localStorage.getItem(DIR_KEY) ?? '')
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedPath, setSelectedPath] = useState(() => localStorage.getItem(DIR_KEY) ?? '')
+  const [customPath, setCustomPath] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    api.getProjects()
+      .then(list => {
+        setProjects(list)
+        // Auto-select saved path if still valid, otherwise select first project
+        const saved = localStorage.getItem(DIR_KEY)
+        if (!saved && list.length > 0) setSelectedPath(list[0].path)
+      })
+      .catch(() => {})
+  }, [])
+
+  const isCustom = selectedPath === '__custom__'
+  const effectiveDir = isCustom ? customPath.trim() : selectedPath
 
   async function submit() {
     const text = prompt.trim()
@@ -17,17 +35,20 @@ export default function PromptForm({ onCreated }: { onCreated: () => void }) {
     setError('')
     try {
       const escapedPrompt = text.replace(/"/g, '\\"')
-      const workingDir = dir.trim()
-      const command = workingDir
-        ? `cd /d "${workingDir}" && claude -p "${escapedPrompt}"`
+      const command = effectiveDir
+        ? `cd /d "${effectiveDir}" && claude -p "${escapedPrompt}"`
         : `claude -p "${escapedPrompt}"`
 
-      if (workingDir) localStorage.setItem(DIR_KEY, workingDir)
+      if (effectiveDir) localStorage.setItem(DIR_KEY, selectedPath)
+
+      const projectName = projects.find(p => p.path === effectiveDir)?.name
+        ?? effectiveDir.split(/[\\/]/).pop()
+        ?? ''
 
       await api.createTask({
         name: text.slice(0, 60),
         command,
-        description: workingDir ? `Claude Code @ ${workingDir.split(/[\\/]/).pop()}` : 'Prompt Claude Code',
+        description: projectName ? `Claude Code @ ${projectName}` : 'Prompt Claude Code',
       })
       setPrompt('')
       onCreated()
@@ -52,16 +73,30 @@ export default function PromptForm({ onCreated }: { onCreated: () => void }) {
       </div>
 
       <div className={styles.dirGroup}>
-        <label className={styles.dirLabel}>Directorio de trabajo</label>
-        <input
-          className={styles.dirInput}
-          type="text"
-          placeholder="C:\Users\Francisco\Documents\Projects\MiProyecto"
-          value={dir}
-          onChange={e => setDir(e.target.value)}
-          spellCheck={false}
-        />
-        <span className={styles.dirHint}>Se recuerda entre sesiones</span>
+        <label className={styles.dirLabel}>Proyecto</label>
+        <select
+          className={styles.select}
+          value={selectedPath}
+          onChange={e => setSelectedPath(e.target.value)}
+        >
+          <option value="">— Sin directorio —</option>
+          {projects.map(p => (
+            <option key={p.path} value={p.path}>{p.name}</option>
+          ))}
+          <option value="__custom__">Ruta personalizada...</option>
+        </select>
+
+        {isCustom && (
+          <input
+            className={styles.dirInput}
+            type="text"
+            placeholder="C:\ruta\al\proyecto"
+            value={customPath}
+            onChange={e => setCustomPath(e.target.value)}
+            spellCheck={false}
+            autoFocus
+          />
+        )}
       </div>
 
       <textarea
@@ -71,7 +106,6 @@ export default function PromptForm({ onCreated }: { onCreated: () => void }) {
         onChange={e => setPrompt(e.target.value)}
         onKeyDown={onKeyDown}
         rows={6}
-        autoFocus
       />
 
       {error && <p className={styles.error}>{error}</p>}

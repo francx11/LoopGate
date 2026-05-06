@@ -1,12 +1,27 @@
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from typing import List
 
+from app.core.config import settings
 from app.core.store import task_store
 from app.core.ws_manager import manager
 from app.models.task import Task, TaskStatus, CreateTaskRequest, ApproveTaskRequest
 from app.services.executor import run_task
 
 router = APIRouter(tags=["tasks"])
+
+
+@router.get("/projects", summary="List directories in PROJECTS_ROOT")
+def list_projects():
+    root = Path(settings.PROJECTS_ROOT)
+    if not root.exists():
+        return []
+    return [
+        {"name": d.name, "path": str(d)}
+        for d in sorted(root.iterdir())
+        if d.is_dir() and not d.name.startswith(".")
+    ]
 
 
 @router.get("/tasks", response_model=List[Task], summary="List all tasks")

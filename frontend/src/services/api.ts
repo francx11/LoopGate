@@ -18,6 +18,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
+  getProjects: () => request<{ name: string; path: string }[]>('GET', '/projects'),
+
   getTasks: () => request<any[]>('GET', '/tasks'),
 
   createTask: (data: { name: string; command: string; description?: string }) =>
