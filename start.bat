@@ -35,32 +35,64 @@ call venv\Scripts\activate.bat
 pip install -q -r requirements.txt
 cd ..
 
-:: ── 3. Start backend in separate window ───────────────────────────────────────
-echo [3/3] Arrancando servidor en http://localhost:8000
+:: ── 3. Start backend ──────────────────────────────────────────────────────────
+echo [3/3] Arrancando servidor...
 start "Loopgate Backend" cmd /k "cd /d "%CD%\backend" && venv\Scripts\python.exe run.py"
-
 timeout /t 3 /nobreak > nul
 
-:: ── Ngrok tunnel (optional) ───────────────────────────────────────────────────
-where ngrok > nul 2>&1
+:: ── Mostrar URL de acceso ─────────────────────────────────────────────────────
+echo.
+
+:: Tailscale (prioritario — IP fija, sin tunel publico)
+set TS_IP=
+where tailscale > nul 2>&1
 if %errorlevel% == 0 (
-    echo.
-    echo Iniciando tunel ngrok...
-    start "Ngrok Tunnel" ngrok http 8000
-    timeout /t 2 /nobreak > nul
-    echo.
-    echo  Tunel activo. Abre http://localhost:4040 para ver la URL publica.
-    echo  Copia la URL https://... en tu movil y conectate directamente.
-) else (
-    echo.
-    echo  Ngrok no encontrado. Para acceso desde movil:
-    echo    1. Descarga ngrok en https://ngrok.com/download
-    echo    2. Ejecuta: ngrok http 8000
-    echo    3. Usa la URL https://... en tu navegador movil
-    echo.
-    echo  Acceso local: http://localhost:8000
+    for /f "delims=" %%i in ('tailscale ip -4 2^>nul') do set TS_IP=%%i
 )
 
+if defined TS_IP (
+    echo  ╔══════════════════════════════════════╗
+    echo  ║  Loopgate listo via Tailscale        ║
+    echo  ║                                      ║
+    echo  ║  http://%TS_IP%:8000
+    echo  ║                                      ║
+    echo  ║  Abre esa URL en tu movil.           ║
+    echo  ║  La app se conecta automaticamente.  ║
+    echo  ╚══════════════════════════════════════╝
+    goto :end
+)
+
+:: Tailscale instalado pero sin IP (no conectado)
+where tailscale > nul 2>&1
+if %errorlevel% == 0 (
+    echo  Tailscale instalado pero sin conexion activa.
+    echo  Abre Tailscale en el PC y en el movil y vuelve a intentarlo.
+    echo.
+    echo  Acceso local: http://localhost:8000
+    goto :end
+)
+
+:: ngrok como alternativa
+where ngrok > nul 2>&1
+if %errorlevel% == 0 (
+    echo  Iniciando tunel ngrok...
+    start "Ngrok" ngrok http 8000
+    timeout /t 2 /nobreak > nul
+    echo  Tunel activo. Abre http://localhost:4040 para ver la URL publica.
+    goto :end
+)
+
+:: Ninguno disponible — instrucciones
+echo  Para acceso desde el movil instala Tailscale (recomendado):
 echo.
-echo Presiona cualquier tecla para cerrar esta ventana...
-pause > nul
+echo    winget install tailscale.tailscale
+echo.
+echo  Instala Tailscale tambien en el movil (iOS/Android).
+echo  Ambos deben estar en la misma cuenta de Tailscale.
+echo  Luego vuelve a ejecutar start.bat.
+echo.
+echo  Acceso local: http://localhost:8000
+
+:end
+echo.
+pause

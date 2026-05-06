@@ -59,8 +59,12 @@ TaskExecutor (background daemon thread)
 ```
 
 **Single-port design:** frontend is compiled (`npm run build`) into `frontend/dist/`
-and served by FastAPI via `StaticFiles`. One ngrok tunnel covers everything.
+and served by FastAPI via `StaticFiles`.
 The frontend auto-detects same-origin backend on load — no manual URL setup needed.
+
+**Remote access (Tailscale preferred):** `start.bat` runs `tailscale ip -4` to get
+the stable private IP and prints `http://<IP>:8000`. Mobile opens that URL directly.
+Falls back to ngrok if Tailscale is not available.
 
 ## Task Status FSM
 
