@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { api } from '../services/api'
 import styles from './PromptForm.module.css'
 
+const DIR_KEY = 'lg-last-dir'
+
 export default function PromptForm({ onCreated }: { onCreated: () => void }) {
   const [prompt, setPrompt] = useState('')
+  const [dir, setDir] = useState(() => localStorage.getItem(DIR_KEY) ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -13,11 +16,18 @@ export default function PromptForm({ onCreated }: { onCreated: () => void }) {
     setLoading(true)
     setError('')
     try {
-      const escaped = text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      const escapedPrompt = text.replace(/"/g, '\\"')
+      const workingDir = dir.trim()
+      const command = workingDir
+        ? `cd /d "${workingDir}" && claude -p "${escapedPrompt}"`
+        : `claude -p "${escapedPrompt}"`
+
+      if (workingDir) localStorage.setItem(DIR_KEY, workingDir)
+
       await api.createTask({
         name: text.slice(0, 60),
-        command: `claude -p "${escaped}"`,
-        description: 'Prompt Claude Code',
+        command,
+        description: workingDir ? `Claude Code @ ${workingDir.split(/[\\/]/).pop()}` : 'Prompt Claude Code',
       })
       setPrompt('')
       onCreated()
@@ -41,9 +51,22 @@ export default function PromptForm({ onCreated }: { onCreated: () => void }) {
         </div>
       </div>
 
+      <div className={styles.dirGroup}>
+        <label className={styles.dirLabel}>Directorio de trabajo</label>
+        <input
+          className={styles.dirInput}
+          type="text"
+          placeholder="C:\Users\Francisco\Documents\Projects\MiProyecto"
+          value={dir}
+          onChange={e => setDir(e.target.value)}
+          spellCheck={false}
+        />
+        <span className={styles.dirHint}>Se recuerda entre sesiones</span>
+      </div>
+
       <textarea
         className={styles.textarea}
-        placeholder="Ej: Crea un script Python que lea todos los .log del escritorio y genere un resumen..."
+        placeholder="Ej: Añade tests unitarios para el módulo de autenticación..."
         value={prompt}
         onChange={e => setPrompt(e.target.value)}
         onKeyDown={onKeyDown}
