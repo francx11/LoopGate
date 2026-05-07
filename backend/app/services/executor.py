@@ -6,6 +6,7 @@ Runs commands in subprocesses and streams output via WebSocket.
 import os
 import subprocess
 import threading
+import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -72,11 +73,16 @@ def _run(task_id: str):
         task.status = TaskStatus.DONE if process.returncode == 0 else TaskStatus.ERROR
 
     except Exception as exc:
+        traceback.print_exc()
         task.log.append(LogLine(time=_now(), text=f"LOOPGATE ERROR: {exc}"))
         task.status = TaskStatus.ERROR
         task.exit_code = -1
 
     task.finished_at = _now()
+    # If the process failed silently (e.g. cd to nonexistent dir on Windows),
+    # add the exit code so the user sees something in the log panel.
+    if task.status == TaskStatus.ERROR and not task.log:
+        task.log.append(LogLine(time=_now(), text=f"[exit code {task.exit_code}]"))
     task_store.update(task)
     manager.broadcast_sync({"type": "task_updated", "task": task.model_dump()})
 

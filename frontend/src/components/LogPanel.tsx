@@ -29,7 +29,8 @@ export default function LogPanel({ taskId, onClose }: { taskId: string; onClose:
             {task.status === 'pending_approval' && '⏳ Esperando aprobación...'}
             {task.status === 'queued' && '🔵 En cola, iniciando...'}
             {task.status === 'running' && '⚡ Ejecutando...'}
-            {['done', 'error', 'rejected'].includes(task.status) && 'Sin output'}
+            {['done', 'error', 'rejected'].includes(task.status) &&
+            `Sin output${task.exit_code !== null ? ` (exit ${task.exit_code})` : ''}`}
           </div>
         ) : (
           task.log.map((line, i) => (
