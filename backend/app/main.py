@@ -3,6 +3,7 @@ Loopgate — Backend API
 Human-in-the-loop approval layer for AI agent tasks.
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -12,12 +13,14 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import tasks, websocket
 from app.core.config import settings
+from app.core.ws_manager import manager
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    manager.set_loop(asyncio.get_running_loop())
     auth_status = "TOKEN ACTIVO" if settings.SECRET_TOKEN else "SIN TOKEN (modo dev)"
     print(f"Loopgate iniciando en puerto {settings.PORT} — {auth_status}")
     if FRONTEND_DIST.exists():

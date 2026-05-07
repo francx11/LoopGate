@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useStore, Task } from '../store'
 import { api } from '../services/api'
 import styles from './TaskList.module.css'
@@ -48,8 +49,19 @@ export default function TaskList({ onOpenLog }: { onOpenLog: (id: string) => voi
 }
 
 function TaskCard({ task, onOpenLog }: { task: Task; onOpenLog: (id: string) => void }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
   async function approve(action: 'approve' | 'reject') {
-    await api.approveTask(task.id, action)
+    setLoading(true)
+    setError('')
+    try {
+      await api.approveTask(task.id, action)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al procesar')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -74,13 +86,24 @@ function TaskCard({ task, onOpenLog }: { task: Task; onOpenLog: (id: string) => 
       </div>
 
       {task.status === 'pending_approval' && (
-        <div className={styles.actions} onClick={e => e.stopPropagation()}>
-          <button className={`${styles.btn} ${styles.approve}`} onClick={() => approve('approve')}>
-            ✅ Aprobar
-          </button>
-          <button className={`${styles.btn} ${styles.reject}`} onClick={() => approve('reject')}>
-            🚫 Rechazar
-          </button>
+        <div onClick={e => e.stopPropagation()}>
+          <div className={styles.actions}>
+            <button
+              className={`${styles.btn} ${styles.approve}`}
+              onClick={() => approve('approve')}
+              disabled={loading}
+            >
+              {loading ? '...' : '✅ Aprobar'}
+            </button>
+            <button
+              className={`${styles.btn} ${styles.reject}`}
+              onClick={() => approve('reject')}
+              disabled={loading}
+            >
+              {loading ? '...' : '🚫 Rechazar'}
+            </button>
+          </div>
+          {error && <p style={{ color: 'var(--red)', fontSize: 12, margin: '6px 0 0' }}>{error}</p>}
         </div>
       )}
     </div>

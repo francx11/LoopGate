@@ -5,7 +5,7 @@ Handles broadcasting events to all connected FastAPI WebSocket clients.
 
 import asyncio
 import json
-from typing import Set
+from typing import Optional, Set
 
 from fastapi import WebSocket
 
@@ -13,6 +13,10 @@ from fastapi import WebSocket
 class ConnectionManager:
     def __init__(self):
         self._clients: Set[WebSocket] = set()
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def set_loop(self, loop: asyncio.AbstractEventLoop):
+        self._loop = loop
 
     def add(self, ws: WebSocket):
         self._clients.add(ws)
@@ -39,14 +43,9 @@ class ConnectionManager:
 
     def broadcast_sync(self, event: dict):
         """For use from sync threads (e.g. task execution)."""
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.run_coroutine_threadsafe(self.broadcast(event), loop)
-            else:
-                asyncio.run(self.broadcast(event))
-        except Exception:
-            pass
+        if self._loop is None or not self._loop.is_running():
+            return
+        asyncio.run_coroutine_threadsafe(self.broadcast(event), self._loop)
 
 
 manager = ConnectionManager()
