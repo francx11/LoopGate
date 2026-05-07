@@ -5,9 +5,10 @@ const HEARTBEAT_INTERVAL = 30_000
 const HEARTBEAT_TIMEOUT = 5_000
 const RECONNECT_BASE = 3_000
 const RECONNECT_MAX = 30_000
+const AUTH_FAIL_THRESHOLD = 3  // consecutive fast-fail closes before giving up
 
 export function useWebSocket() {
-  const { config, setConnected, setWs, setTasks, upsertTask, appendLog, deleteTask } = useStore()
+  const { config, setConnected, setWs, setTasks, upsertTask, appendLog, deleteTask, disconnect } = useStore()
 
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const heartbeatTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -17,6 +18,8 @@ export function useWebSocket() {
   useEffect(() => {
     let currentSocket: WebSocket | null = null
     let destroyed = false
+    let fastFailCount = 0
+    let connectTime = 0
 
     function scheduleHeartbeat() {
       if (heartbeatTimer.current) clearTimeout(heartbeatTimer.current)
@@ -53,9 +56,11 @@ export function useWebSocket() {
 
       const socket = new WebSocket(wsUrl)
       currentSocket = socket
+      connectTime = Date.now()
 
       socket.onopen = () => {
         if (destroyed) { socket.close(); return }
+        fastFailCount = 0
         setConnected(true)
         setWs(socket)
         reconnectDelay.current = RECONNECT_BASE
@@ -79,6 +84,17 @@ export function useWebSocket() {
         if (heartbeatTimer.current) { clearTimeout(heartbeatTimer.current); heartbeatTimer.current = null }
         if (pongTimer.current) { clearTimeout(pongTimer.current); pongTimer.current = null }
         setConnected(false)
+        // A close within 1 s of connecting (before onopen) means the server
+        // rejected the handshake — likely a 403 auth failure.
+        const wasInstant = Date.now() - connectTime < 1000
+        if (wasInstant) {
+          fastFailCount++
+          if (fastFailCount >= AUTH_FAIL_THRESHOLD) {
+            // Persistent rejection — clear config so SetupScreen is shown.
+            disconnect()
+            return
+          }
+        }
         scheduleReconnect()
       }
 
@@ -94,5 +110,5 @@ export function useWebSocket() {
       if (pongTimer.current) { clearTimeout(pongTimer.current); pongTimer.current = null }
       currentSocket?.close()
     }
-  }, [config, setConnected, setWs, setTasks, upsertTask, appendLog, deleteTask])
+  }, [config, setConnected, setWs, setTasks, upsertTask, appendLog, deleteTask, disconnect])
 }

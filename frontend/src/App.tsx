@@ -12,21 +12,22 @@ export default function App() {
     const api = localStorage.getItem('lg-api')
     const ws = localStorage.getItem('lg-ws')
     const token = localStorage.getItem('lg-token') ?? ''
-    if (api && ws) {
-      setConfig({ apiUrl: api, wsUrl: ws, token })
-      setReady(true)
-      return
-    }
-    // Auto-detect: try connecting to same-origin backend (when served via FastAPI)
+
+    // Always verify the backend first — checks if auth is required so we
+    // never auto-configure with an empty token when SECRET_TOKEN is set.
     fetch('/health', { signal: AbortSignal.timeout(2000) })
       .then(r => (r.ok ? r.json() : Promise.reject()))
-      .then(() => {
+      .then((data: { auth_required: boolean }) => {
+        if (data.auth_required && !token) return  // show SetupScreen to enter token
         const origin = window.location.origin
         const wsOrigin = origin.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://')
-        const cfg = { apiUrl: origin, wsUrl: `${wsOrigin}/ws`, token }
-        localStorage.setItem('lg-api', cfg.apiUrl)
-        localStorage.setItem('lg-ws', cfg.wsUrl)
-        // Keep existing token; user can update it via SetupScreen if needed
+        const cfg = {
+          apiUrl: api ?? origin,
+          wsUrl: ws ?? `${wsOrigin}/ws`,
+          token,
+        }
+        if (!api) localStorage.setItem('lg-api', cfg.apiUrl)
+        if (!ws) localStorage.setItem('lg-ws', cfg.wsUrl)
         setConfig(cfg)
       })
       .catch(() => {})
