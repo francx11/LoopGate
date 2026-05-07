@@ -126,10 +126,14 @@ frontend/dist/
 
 ## Git Workflow
 
-**Commits automáticos al completar funcionalidad:**
-- Cuando una unidad de cambio es autocontenida y verificable (un endpoint nuevo, un componente terminado, una migración completa), hacer commit sin esperar instrucción explícita.
-- Mensaje en formato Conventional Commits: `feat:`, `fix:`, `refactor:`, `chore:`, etc.
-- Un commit por unidad lógica — no agrupar cambios no relacionados, no dividir un cambio coherente en varios commits.
+**Commit format (mandatory):**
+- Language: **English only** — subject line and body
+- Style: Conventional Commits — `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`
+- **No co-authorship trailer** — never append `Co-Authored-By:` lines
+- One commit per logical unit — don't batch unrelated changes, don't split a coherent change
+
+**Auto-commit on completion:**
+- When a unit of change is self-contained and verifiable (new endpoint, finished component, complete migration), commit without waiting for explicit instruction.
 
 **Ramas para features grandes:**
 - Si el trabajo toca más de un subsistema (ej. backend + frontend + config) o requiere más de ~3 commits, crear una rama dedicada antes de empezar: `git checkout -b feature/<nombre-descriptivo>`.
