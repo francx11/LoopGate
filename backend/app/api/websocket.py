@@ -20,8 +20,13 @@ async def websocket_endpoint(websocket: WebSocket):
             "type": "init",
             "tasks": [t.model_dump() for t in task_store.all()],
         }))
-        async for _ in websocket.iter_text():
-            pass  # server-driven only; clients don't send commands over WS
+        async for raw in websocket.iter_text():
+            try:
+                msg = json.loads(raw)
+                if msg.get("type") == "ping":
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+            except Exception:
+                pass
     except WebSocketDisconnect:
         pass
     finally:
