@@ -42,6 +42,9 @@ export const api = {
   createTask: (data: { name: string; command: string; description?: string }) =>
     request<any>('POST', '/tasks', data),
 
+  createClaudePrompt: (data: { prompt: string; project_path: string }) =>
+    request<any>('POST', '/tasks/claude-prompt', data),
+
   approveTask: (id: string, action: 'approve' | 'reject', reason = '') =>
     request<any>('POST', `/tasks/${id}/approve`, { action, reason }),
 

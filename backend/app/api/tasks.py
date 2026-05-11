@@ -1,20 +1,25 @@
+import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import List
 
 from app.core.auth import verify_token
 from app.core.config import settings
 from app.core.store import task_store
 from app.core.ws_manager import manager
+from app.core.limiter import limiter
 from app.models.task import Task, TaskStatus, CreateTaskRequest, ApproveTaskRequest
+from app.models.claude import CreateClaudePromptRequest, build_claude_command
 from app.services.executor import run_task
 
 router = APIRouter(tags=["tasks"], dependencies=[Depends(verify_token)])
+audit = logging.getLogger("loopgate.audit")
 
 
 @router.get("/projects", summary="List directories in PROJECTS_ROOT")
-def list_projects():
+@limiter.limit("60/minute")
+def list_projects(request: Request):
     root = Path(settings.PROJECTS_ROOT).resolve()
     if not root.exists():
         return []
@@ -27,12 +32,14 @@ def list_projects():
 
 
 @router.get("/tasks", response_model=List[Task], summary="List all tasks")
-def list_tasks():
+@limiter.limit("120/minute")
+def list_tasks(request: Request):
     return task_store.all()
 
 
 @router.get("/tasks/{task_id}", response_model=Task, summary="Get a single task")
-def get_task(task_id: str):
+@limiter.limit("120/minute")
+def get_task(request: Request, task_id: str):
     task = task_store.get(task_id)
     if not task:
         raise HTTPException(404, f"Task '{task_id}' not found")
@@ -40,15 +47,44 @@ def get_task(task_id: str):
 
 
 @router.post("/tasks", response_model=Task, status_code=201, summary="Create a task")
-async def create_task(body: CreateTaskRequest):
+@limiter.limit("30/minute")
+async def create_task(request: Request, body: CreateTaskRequest):
     task = Task(name=body.name, command=body.command, description=body.description)
     task_store.add(task)
     await manager.broadcast({"type": "task_created", "task": task.model_dump()})
+    audit.info("task_created id=%s name=%r ip=%s", task.id[:8], body.name, _ip(request))
+    return task
+
+
+@router.post(
+    "/tasks/claude-prompt",
+    response_model=Task,
+    status_code=201,
+    summary="Create a Claude Code task from a natural-language prompt",
+)
+@limiter.limit("20/minute")
+async def create_claude_prompt(request: Request, body: CreateClaudePromptRequest):
+    command = build_claude_command(body.prompt, body.project_path, settings.PROJECTS_ROOT)
+    project_label = (
+        Path(body.project_path).name if body.project_path else "—"
+    )
+    task = Task(
+        name=body.prompt[:60],
+        command=command,
+        description=f"Claude Code @ {project_label}" if body.project_path else "Claude Code prompt",
+    )
+    task_store.add(task)
+    await manager.broadcast({"type": "task_created", "task": task.model_dump()})
+    audit.info(
+        "claude_prompt_created id=%s project=%r ip=%s",
+        task.id[:8], body.project_path, _ip(request),
+    )
     return task
 
 
 @router.post("/tasks/{task_id}/approve", summary="Approve or reject a pending task")
-async def approve_task(task_id: str, body: ApproveTaskRequest):
+@limiter.limit("30/minute")
+async def approve_task(request: Request, task_id: str, body: ApproveTaskRequest):
     task = task_store.get(task_id)
     if not task:
         raise HTTPException(404, f"Task '{task_id}' not found")
@@ -60,18 +96,33 @@ async def approve_task(task_id: str, body: ApproveTaskRequest):
         task_store.update(task)
         await manager.broadcast({"type": "task_updated", "task": task.model_dump()})
         run_task(task)
+        audit.info(
+            "task_approved id=%s name=%r ip=%s",
+            task.id[:8], task.name, _ip(request),
+        )
         return {"ok": True, "message": "Task approved and queued for execution"}
 
     task.status = TaskStatus.REJECTED
     task.reject_reason = body.reason
     task_store.update(task)
     await manager.broadcast({"type": "task_updated", "task": task.model_dump()})
+    audit.info(
+        "task_rejected id=%s name=%r reason=%r ip=%s",
+        task.id[:8], task.name, body.reason, _ip(request),
+    )
     return {"ok": True, "message": "Task rejected"}
 
 
 @router.delete("/tasks/{task_id}", summary="Delete a task")
-async def delete_task(task_id: str):
+@limiter.limit("30/minute")
+async def delete_task(request: Request, task_id: str):
     if not task_store.delete(task_id):
         raise HTTPException(404, f"Task '{task_id}' not found")
     await manager.broadcast({"type": "task_deleted", "task_id": task_id})
+    audit.info("task_deleted id=%s ip=%s", task_id[:8], _ip(request))
     return {"ok": True}
+
+
+def _ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    return forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")

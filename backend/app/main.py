@@ -9,10 +9,14 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.api import tasks, websocket
 from app.core.config import settings
+from app.core.limiter import limiter
 from app.core.ws_manager import manager
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
@@ -34,20 +38,31 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Loopgate API",
     description="Human-in-the-loop approval layer for AI agent tasks",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
-    # Disable OpenAPI docs in production when token is set
     docs_url=None if settings.SECRET_TOKEN else "/docs",
     redoc_url=None if settings.SECRET_TOKEN else "/redoc",
 )
 
-# CORS: default empty list (same-origin only). Add origins in .env if needed.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
+)
+
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "connect-src 'self' ws: wss:; "
+    "font-src 'self'; "
+    "frame-ancestors 'none'"
 )
 
 
@@ -59,6 +74,7 @@ async def security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    response.headers["Content-Security-Policy"] = _CSP
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
@@ -70,7 +86,7 @@ app.include_router(websocket.router)
 
 @app.get("/health", tags=["system"])
 def health():
-    return {"status": "ok", "version": "0.1.0", "auth_required": bool(settings.SECRET_TOKEN)}
+    return {"status": "ok", "version": "0.2.0", "auth_required": bool(settings.SECRET_TOKEN)}
 
 
 # Must come last — catches all unmatched routes for SPA client-side routing
