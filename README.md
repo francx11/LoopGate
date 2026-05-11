@@ -3,8 +3,9 @@
 > **Human-in-the-loop approval layer for AI agent tasks.**  
 > Monitor, approve, and control your AI agent's actions from anywhere in the world — right from your phone.
 
+[![CI](https://github.com/francx11/loopgate/actions/workflows/ci.yml/badge.svg)](https://github.com/francx11/loopgate/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://react.dev)
 
@@ -75,9 +76,9 @@ AI Agent ──► Loopgate Server ──► [ Pending Approval ] ──► Your
 
 ### Prerequisites
 
-- Python 3.9+
-- Node.js 18+ (for frontend)
-- [ngrok](https://ngrok.com) account (free tier works)
+- Python 3.11+
+- Node.js 20+
+- [Tailscale](https://tailscale.com) (recommended) or [ngrok](https://ngrok.com)
 
 ### 1. Clone the repo
 
@@ -97,23 +98,21 @@ cp .env.example .env
 python run.py
 ```
 
-### 3. Open a public tunnel
+### 3. Access from your phone
 
+**Option A — Tailscale (recommended):**
+Install Tailscale on both your PC and phone. Join the same account.
+Open `http://<tailscale-ip>:8000` on your phone — the app auto-connects.
+
+**Option B — ngrok:**
 ```bash
 ngrok http 8000
 ```
+Open the `https://xxx.ngrok-free.app` URL on your phone and enter it in the
+setup screen.
 
-Copy the `https://xxx.ngrok-free.app` URL — you'll need it in the mobile app.
-
-### 4. Start the frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open `http://localhost:5173` in your mobile browser and enter the ngrok URL.
+> The frontend is compiled into `frontend/dist/` and served by FastAPI on the
+> same port (:8000). No separate dev server needed in production.
 
 ---
 
@@ -185,7 +184,8 @@ Full interactive docs available at `http://localhost:8000/docs` when the server 
 | `POST` | `/api/v1/tasks` | Create a new task |
 | `POST` | `/api/v1/tasks/{id}/approve` | Approve or reject a task |
 | `DELETE` | `/api/v1/tasks/{id}` | Delete a task |
-| `GET` | `/health` | Server health check |
+| `GET` | `/health` | Server health + `auth_required` flag |
+| `POST` | `/api/v1/tasks/claude-prompt` | Create Claude Code task from natural-language prompt |
 
 ### POST /api/v1/tasks
 
@@ -208,7 +208,7 @@ Full interactive docs available at `http://localhost:8000/docs` when the server 
 
 ### WebSocket Events
 
-Connect to `ws://HOST:8765`
+Connect to `ws://HOST:8000/ws` (same port as REST API)
 
 | Event | Direction | Payload |
 |-------|-----------|---------|
