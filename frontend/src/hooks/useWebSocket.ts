@@ -50,16 +50,20 @@ export function useWebSocket() {
     function connect() {
       if (!config || destroyed) return
 
-      const wsUrl = config.token
-        ? `${config.wsUrl}?token=${encodeURIComponent(config.token)}`
-        : config.wsUrl
-
-      const socket = new WebSocket(wsUrl)
+      const socket = new WebSocket(config.wsUrl)
       currentSocket = socket
       connectTime = Date.now()
 
       socket.onopen = () => {
         if (destroyed) { socket.close(); return }
+        // Auth via first message — keeps the token out of proxy access logs
+        // and lets the server reject without a pre-accept HTTP 403.
+        try {
+          socket.send(JSON.stringify({ type: 'auth', token: config.token ?? '' }))
+        } catch {
+          socket.close()
+          return
+        }
         fastFailCount = 0
         setConnected(true)
         setWs(socket)
@@ -73,6 +77,12 @@ export function useWebSocket() {
         scheduleHeartbeat()
         const msg = JSON.parse(e.data)
         if (msg.type === 'pong') return
+        if (msg.type === 'auth_error') {
+          // Token rejected post-handshake. Drop config so SetupScreen reappears
+          // and the user can re-enter the right token.
+          disconnect()
+          return
+        }
         if (msg.type === 'init') setTasks(msg.tasks)
         else if (msg.type === 'task_created') upsertTask(msg.task)
         else if (msg.type === 'task_updated') upsertTask(msg.task)
