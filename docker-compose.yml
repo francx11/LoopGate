@@ -1,0 +1,38 @@
+services:
+  loopgate:
+    build: .
+    restart: unless-stopped
+    env_file: backend/.env
+    environment:
+      - STORE_BACKEND=sqlite
+      - SQLITE_PATH=/app/data/loopgate.db
+      - PROJECTS_ROOT=/app/data/projects
+    volumes:
+      - loopgate-data:/app/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Optional: Caddy reverse proxy with automatic HTTPS (Let's Encrypt)
+  # Uncomment and set LOOPGATE_DOMAIN in your environment to enable.
+  # caddy:
+  #   image: caddy:2-alpine
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy-data:/data
+  #     - caddy-config:/config
+  #   depends_on:
+  #     - loopgate
+
+volumes:
+  loopgate-data:
+  # caddy-data:
+  # caddy-config:

@@ -12,20 +12,40 @@ from pathlib import Path
 
 
 # Only expose OS-level variables to subprocesses — never secrets or tokens.
-_ENV_WHITELIST = {
+_WINDOWS_WHITELIST = {
     "PATH", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "HOME",
     "COMSPEC", "SystemRoot", "SystemDrive", "WINDIR", "OS",
     "APPDATA", "LOCALAPPDATA", "USERNAME", "COMPUTERNAME",
     "PROCESSOR_ARCHITECTURE", "TERM", "LANG", "LC_ALL",
 }
+_POSIX_WHITELIST = {
+    "PATH", "HOME", "USER", "LOGNAME", "SHELL",
+    "TERM", "LANG", "LC_ALL", "LC_CTYPE",
+    "XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP",
+}
 
 
 def _build_env() -> dict:
-    env = {k: v for k, v in os.environ.items() if k in _ENV_WHITELIST}
-    npm_global = str(Path.home() / "AppData" / "Roaming" / "npm")
+    whitelist = _WINDOWS_WHITELIST if os.name == "nt" else _POSIX_WHITELIST
+    env = {k: v for k, v in os.environ.items() if k in whitelist}
     path = env.get("PATH", "")
-    if npm_global not in path:
-        env["PATH"] = npm_global + os.pathsep + path
+
+    if os.name == "nt":
+        # Windows: add global npm directory so `claude` is reachable
+        npm_global = str(Path.home() / "AppData" / "Roaming" / "npm")
+        if npm_global not in path:
+            env["PATH"] = npm_global + os.pathsep + path
+    else:
+        # POSIX: add common user-local bin directories
+        extra = [
+            str(Path.home() / ".npm-global" / "bin"),
+            str(Path.home() / ".local" / "bin"),
+            "/usr/local/bin",
+        ]
+        additions = [p for p in extra if p not in path]
+        if additions:
+            env["PATH"] = os.pathsep.join(additions) + os.pathsep + path
+
     return env
 
 from app.core.store import task_store

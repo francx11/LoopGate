@@ -9,10 +9,10 @@ import uvicorn
 from app.core.config import settings
 
 if __name__ == "__main__":
-    print(f"Loopgate starting on http://0.0.0.0:{settings.PORT}")
+    print(f"Loopgate starting on http://{settings.HOST}:{settings.PORT}")
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
+        host=settings.HOST,
         port=settings.PORT,
         log_level=settings.LOG_LEVEL,
         reload=False,

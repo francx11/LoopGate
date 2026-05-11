@@ -1,0 +1,25 @@
+[Unit]
+Description=Loopgate — human-in-the-loop approval server
+After=network.target
+
+[Service]
+Type=simple
+User=loopgate
+Group=loopgate
+WorkingDirectory=/opt/loopgate/backend
+EnvironmentFile=/opt/loopgate/backend/.env
+ExecStart=/opt/loopgate/backend/venv/bin/python run.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=loopgate
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/loopgate/data
+
+[Install]
+WantedBy=multi-user.target

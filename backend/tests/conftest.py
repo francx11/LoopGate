@@ -13,9 +13,11 @@ def token() -> str:
 
 @pytest.fixture(autouse=True)
 def reset_store():
-    task_store._tasks.clear()
+    for task in task_store.all():
+        task_store.delete(task.id)
     yield
-    task_store._tasks.clear()
+    for task in task_store.all():
+        task_store.delete(task.id)
 
 
 @pytest.fixture

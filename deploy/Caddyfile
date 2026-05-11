@@ -1,0 +1,25 @@
+# Loopgate — Caddyfile
+# Replace loopgate.example.com with your domain.
+# Caddy obtains a Let's Encrypt certificate automatically.
+
+loopgate.example.com {
+    reverse_proxy loopgate:8000
+
+    # WebSocket support — Caddy handles this transparently
+    # but explicit header stripping helps some edge cases
+    header_up X-Forwarded-Proto {scheme}
+
+    # Optional: restrict access by IP (remove if using SECRET_TOKEN instead)
+    # @allowed remote 203.0.113.0/24 100.64.0.0/10
+    # handle @allowed {
+    #     reverse_proxy loopgate:8000
+    # }
+    # handle {
+    #     respond "Forbidden" 403
+    # }
+
+    log {
+        output file /var/log/caddy/loopgate.log
+        format json
+    }
+}
