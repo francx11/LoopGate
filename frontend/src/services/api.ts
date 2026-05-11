@@ -8,6 +8,12 @@ function getToken() {
   return useStore.getState().config?.token ?? ''
 }
 
+function handleAuthFailure() {
+  // Stale or wrong token. Drop it so SetupScreen re-prompts on the next render.
+  localStorage.removeItem('lg-token')
+  useStore.getState().disconnect()
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = getToken()
   const res = await fetch(`${getBase()}/api/v1${path}`, {
@@ -19,6 +25,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      handleAuthFailure()
+    }
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail ?? `HTTP ${res.status}`)
   }
