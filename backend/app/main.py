@@ -9,7 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -89,6 +89,17 @@ def health():
     return {"status": "ok", "version": "0.2.0", "auth_required": bool(settings.SECRET_TOKEN)}
 
 
-# Must come last — catches all unmatched routes for SPA client-side routing
+# SPA fallback: serve index.html for all non-API, non-static paths so that
+# React Router can handle client-side routes on direct browser navigation.
 if FRONTEND_DIST.exists():
+    _index = FRONTEND_DIST / "index.html"
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str):
+        # Let real static asset paths (assets/, icons, etc.) fall through to the mount
+        static_file = FRONTEND_DIST / full_path
+        if static_file.is_file():
+            return FileResponse(str(static_file))
+        return FileResponse(str(_index))
+
     app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
