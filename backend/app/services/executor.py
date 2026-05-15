@@ -11,32 +11,26 @@ from datetime import datetime
 from pathlib import Path
 
 
-# Only expose OS-level variables to subprocesses — never secrets or tokens.
-_WINDOWS_WHITELIST = {
-    "PATH", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "HOME",
-    "COMSPEC", "SystemRoot", "SystemDrive", "WINDIR", "OS",
-    "APPDATA", "LOCALAPPDATA", "USERNAME", "COMPUTERNAME",
-    "PROCESSOR_ARCHITECTURE", "TERM", "LANG", "LC_ALL",
-}
-_POSIX_WHITELIST = {
-    "PATH", "HOME", "USER", "LOGNAME", "SHELL",
-    "TERM", "LANG", "LC_ALL", "LC_CTYPE",
-    "XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP",
+# Strip known secrets/session vars — pass everything else through intact.
+_SECRET_DENYLIST = {
+    "SECRET_TOKEN",
+    "CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_ENTRYPOINT",
+    "CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING", "AI_AGENT",
+    "CLAUDE_AGENT_SDK_VERSION", "MCP_CONNECTION_NONBLOCKING",
+    "VSCODE_IPC_HOOK", "VSCODE_PID",
+    "CHROME_CRASHPAD_PIPE_NAME",
 }
 
 
 def _build_env() -> dict:
-    whitelist = _WINDOWS_WHITELIST if os.name == "nt" else _POSIX_WHITELIST
-    env = {k: v for k, v in os.environ.items() if k in whitelist}
+    env = {k: v for k, v in os.environ.items() if k not in _SECRET_DENYLIST}
     path = env.get("PATH", "")
 
     if os.name == "nt":
-        # Windows: add global npm directory so `claude` is reachable
         npm_global = str(Path.home() / "AppData" / "Roaming" / "npm")
         if npm_global not in path:
             env["PATH"] = npm_global + os.pathsep + path
     else:
-        # POSIX: add common user-local bin directories
         extra = [
             str(Path.home() / ".npm-global" / "bin"),
             str(Path.home() / ".local" / "bin"),
@@ -57,6 +51,13 @@ def _now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _emit(task: Task, task_id: str, text: str):
+    line = LogLine(time=_now(), text=text)
+    task.log.append(line)
+    task_store.update(task)
+    manager.broadcast_sync({"type": "task_log", "task_id": task_id, "line": line.model_dump()})
+
+
 def _run(task_id: str):
     task = task_store.get(task_id)
     if not task:
@@ -67,42 +68,45 @@ def _run(task_id: str):
     task_store.update(task)
     manager.broadcast_sync({"type": "task_updated", "task": task.model_dump()})
 
+    cwd = str(Path.home())
+    _emit(task, task_id, f"[loopgate] cwd={cwd}")
+    _emit(task, task_id, f"[loopgate] cmd={task.command}")
+
     try:
         process = subprocess.Popen(
             task.command,
             shell=True,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             text=True,
-            cwd=str(Path.home()),
+            cwd=cwd,
             env=_build_env(),
         )
 
+        def _drain_stderr():
+            for raw in iter(process.stderr.readline, ""):
+                _emit(task, task_id, f"[stderr] {raw.rstrip()}")
+
+        stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+        stderr_thread.start()
+
         for raw_line in iter(process.stdout.readline, ""):
-            line = LogLine(time=_now(), text=raw_line.rstrip())
-            task.log.append(line)
-            task_store.update(task)
-            manager.broadcast_sync({
-                "type": "task_log",
-                "task_id": task_id,
-                "line": line.model_dump(),
-            })
+            _emit(task, task_id, raw_line.rstrip())
 
         process.wait()
+        stderr_thread.join(timeout=5)
         task.exit_code = process.returncode
         task.status = TaskStatus.DONE if process.returncode == 0 else TaskStatus.ERROR
 
     except Exception as exc:
         traceback.print_exc()
-        task.log.append(LogLine(time=_now(), text=f"LOOPGATE ERROR: {exc}"))
+        _emit(task, task_id, f"[loopgate] EXCEPTION: {exc}")
         task.status = TaskStatus.ERROR
         task.exit_code = -1
 
     task.finished_at = _now()
-    # If the process failed silently (e.g. cd to nonexistent dir on Windows),
-    # add the exit code so the user sees something in the log panel.
-    if task.status == TaskStatus.ERROR and not task.log:
-        task.log.append(LogLine(time=_now(), text=f"[exit code {task.exit_code}]"))
+    _emit(task, task_id, f"[loopgate] exit={task.exit_code} status={task.status}")
     task_store.update(task)
     manager.broadcast_sync({"type": "task_updated", "task": task.model_dump()})
 
