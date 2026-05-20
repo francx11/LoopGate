@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
+import { useStore } from '../store'
 import styles from './PromptForm.module.css'
 
 const DIR_KEY = 'lg-last-dir'
@@ -11,8 +12,11 @@ export default function PromptForm({ onCreated }: { onCreated: () => void }) {
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedPath, setSelectedPath] = useState(() => localStorage.getItem(DIR_KEY) ?? '')
   const [customPath, setCustomPath] = useState('')
+  const [continueSession, setContinueSession] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const { sessions, setSessions, deleteSession } = useStore()
 
   useEffect(() => {
     api.getProjects()
@@ -22,10 +26,20 @@ export default function PromptForm({ onCreated }: { onCreated: () => void }) {
         if (!saved && list.length > 0) setSelectedPath(list[0].path)
       })
       .catch(() => {})
-  }, [])
+
+    api.getSessions()
+      .then(s => setSessions(s))
+      .catch(() => {})
+  }, [setSessions])
 
   const isCustom = selectedPath === '__custom__'
   const effectiveDir = isCustom ? customPath.trim() : selectedPath
+  const activeSessionId = effectiveDir ? sessions[effectiveDir] : undefined
+
+  // When project changes, default the toggle to ON if a session exists
+  useEffect(() => {
+    setContinueSession(!!activeSessionId)
+  }, [effectiveDir, activeSessionId])
 
   async function submit() {
     const text = prompt.trim()
@@ -34,13 +48,26 @@ export default function PromptForm({ onCreated }: { onCreated: () => void }) {
     setError('')
     try {
       if (effectiveDir) localStorage.setItem(DIR_KEY, selectedPath)
-      await api.createClaudePrompt({ prompt: text, project_path: effectiveDir })
+      await api.createClaudePrompt({
+        prompt: text,
+        project_path: effectiveDir,
+        new_session: activeSessionId ? !continueSession : false,
+      })
       setPrompt('')
       onCreated()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al enviar')
     }
     setLoading(false)
+  }
+
+  async function handleClearSession() {
+    if (!effectiveDir) return
+    try {
+      await api.clearSession(effectiveDir)
+      deleteSession(effectiveDir)
+      setContinueSession(false)
+    } catch { /* ignore */ }
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -81,6 +108,33 @@ export default function PromptForm({ onCreated }: { onCreated: () => void }) {
             spellCheck={false}
             autoFocus
           />
+        )}
+
+        {activeSessionId && (
+          <div className={styles.sessionRow}>
+            <div className={styles.sessionBadge}>
+              <span className={styles.sessionDot} />
+              sesión activa · {activeSessionId.slice(0, 8)}
+            </div>
+            <button className={styles.sessionClear} onClick={handleClearSession} title="Borrar sesión">
+              × limpiar
+            </button>
+          </div>
+        )}
+
+        {activeSessionId && (
+          <div className={styles.toggleRow}>
+            <input
+              id="continue-session"
+              type="checkbox"
+              className={styles.toggleCheck}
+              checked={continueSession}
+              onChange={e => setContinueSession(e.target.checked)}
+            />
+            <label htmlFor="continue-session" className={styles.toggleLabel}>
+              Continuar sesión anterior
+            </label>
+          </div>
         )}
       </div>
 

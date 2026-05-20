@@ -120,3 +120,31 @@ def _make_store():
 
 
 task_store = _make_store()
+
+
+class SessionStore:
+    """Maps project_path → claude session_id (in-memory only)."""
+
+    def __init__(self):
+        self._sessions: Dict[str, str] = {}
+        self._lock = threading.Lock()
+
+    def set(self, project_path: str, session_id: str) -> None:
+        with self._lock:
+            self._sessions[project_path] = session_id
+
+    def get(self, project_path: str) -> Optional[str]:
+        return self._sessions.get(project_path)
+
+    def delete(self, project_path: str) -> bool:
+        with self._lock:
+            if project_path in self._sessions:
+                del self._sessions[project_path]
+                return True
+        return False
+
+    def all(self) -> Dict[str, str]:
+        return dict(self._sessions)
+
+
+session_store = SessionStore()

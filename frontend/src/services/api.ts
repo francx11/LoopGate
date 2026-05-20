@@ -42,7 +42,7 @@ export const api = {
   createTask: (data: { name: string; command: string; description?: string }) =>
     request<any>('POST', '/tasks', data),
 
-  createClaudePrompt: (data: { prompt: string; project_path: string }) =>
+  createClaudePrompt: (data: { prompt: string; project_path: string; new_session?: boolean }) =>
     request<any>('POST', '/tasks/claude-prompt', data),
 
   approveTask: (id: string, action: 'approve' | 'reject', reason = '') =>
@@ -50,4 +50,10 @@ export const api = {
 
   deleteTask: (id: string) =>
     request<any>('DELETE', `/tasks/${id}`),
+
+  getSessions: () =>
+    request<Record<string, string>>('GET', '/sessions'),
+
+  clearSession: (projectPath: string) =>
+    request<any>('DELETE', `/sessions?project_path=${encodeURIComponent(projectPath)}`),
 }

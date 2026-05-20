@@ -2,11 +2,11 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from typing import List
+from typing import Dict, List
 
 from app.core.auth import verify_token
 from app.core.config import settings
-from app.core.store import task_store
+from app.core.store import task_store, session_store
 from app.core.ws_manager import manager
 from app.core.limiter import limiter
 from app.models.task import Task, TaskStatus, CreateTaskRequest, ApproveTaskRequest
@@ -64,20 +64,30 @@ async def create_task(request: Request, body: CreateTaskRequest):
 )
 @limiter.limit("20/minute")
 async def create_claude_prompt(request: Request, body: CreateClaudePromptRequest):
-    command = build_claude_command(body.prompt, body.project_path, settings.PROJECTS_ROOT)
-    project_label = (
-        Path(body.project_path).name if body.project_path else "—"
+    # Resume existing session unless caller requested a fresh one
+    session_id: str | None = None
+    if not body.new_session and body.project_path:
+        session_id = session_store.get(body.project_path)
+
+    command = build_claude_command(
+        body.prompt, body.project_path, settings.PROJECTS_ROOT, session_id
     )
+    project_label = Path(body.project_path).name if body.project_path else "—"
+    session_label = f" · sesión {session_id[:8]}" if session_id else ""
     task = Task(
         name=body.prompt[:60],
         command=command,
-        description=f"Claude Code @ {project_label}" if body.project_path else "Claude Code prompt",
+        description=(
+            f"Claude Code @ {project_label}{session_label}"
+            if body.project_path
+            else "Claude Code prompt"
+        ),
     )
     task_store.add(task)
     await manager.broadcast({"type": "task_created", "task": task.model_dump()})
     audit.info(
-        "claude_prompt_created id=%s project=%r ip=%s",
-        task.id[:8], body.project_path, _ip(request),
+        "claude_prompt_created id=%s project=%r session=%r ip=%s",
+        task.id[:8], body.project_path, session_id, _ip(request),
     )
     return task
 
@@ -95,7 +105,9 @@ async def approve_task(request: Request, task_id: str, body: ApproveTaskRequest)
         task.status = TaskStatus.QUEUED
         task_store.update(task)
         await manager.broadcast({"type": "task_updated", "task": task.model_dump()})
-        run_task(task)
+        # Extract project_path from command so executor can update session_store
+        project_path = _extract_project_path(task.command)
+        run_task(task, project_path)
         audit.info(
             "task_approved id=%s name=%r ip=%s",
             task.id[:8], task.name, _ip(request),
@@ -123,6 +135,32 @@ async def delete_task(request: Request, task_id: str):
     return {"ok": True}
 
 
+# ── Session endpoints ─────────────────────────────────────────────────────────
+
+@router.get("/sessions", response_model=Dict[str, str], summary="List active Claude sessions")
+@limiter.limit("60/minute")
+def list_sessions(request: Request):
+    return session_store.all()
+
+
+@router.delete("/sessions", summary="Clear a Claude session by project path")
+@limiter.limit("30/minute")
+async def clear_session(request: Request, project_path: str):
+    deleted = session_store.delete(project_path)
+    if deleted:
+        await manager.broadcast({"type": "session_deleted", "project_path": project_path})
+    return {"ok": True, "deleted": deleted}
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
 def _ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
     return forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+
+
+def _extract_project_path(command: str) -> str:
+    """Best-effort extraction of the cd target from a claude command string."""
+    import re
+    m = re.search(r'cd(?:\s+/d)?\s+"([^"]+)"', command)
+    return m.group(1) if m else ""

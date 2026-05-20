@@ -3,6 +3,7 @@ Task execution service.
 Runs commands in subprocesses and streams output via WebSocket.
 """
 
+import json
 import os
 import subprocess
 import threading
@@ -42,7 +43,7 @@ def _build_env() -> dict:
 
     return env
 
-from app.core.store import task_store
+from app.core.store import task_store, session_store
 from app.core.ws_manager import manager
 from app.models.task import Task, TaskStatus, LogLine
 
@@ -58,7 +59,76 @@ def _emit(task: Task, task_id: str, text: str):
     manager.broadcast_sync({"type": "task_log", "task_id": task_id, "line": line.model_dump()})
 
 
-def _run(task_id: str):
+def _parse_stream_event(raw: str) -> tuple[str | None, str | None, float | None]:
+    """
+    Parse one stream-json event line.
+    Returns (display_text, session_id, cost_usd).
+    Any field may be None if not present/applicable.
+    """
+    try:
+        ev = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return raw, None, None  # plain text — display as-is
+
+    t = ev.get("type", "")
+    session_id: str | None = ev.get("session_id")
+    cost_usd: float | None = None
+    display: str | None = None
+
+    if t == "system":
+        # init event — only extract session_id, nothing to display
+        pass
+
+    elif t == "assistant":
+        msg = ev.get("message", {})
+        texts = [
+            block["text"]
+            for block in msg.get("content", [])
+            if block.get("type") == "text" and block.get("text", "").strip()
+        ]
+        display = "\n".join(texts) or None
+
+    elif t == "tool_use":
+        name = ev.get("name", "?")
+        inp = ev.get("input", {})
+        # Show the most meaningful input field as a short preview
+        preview = ""
+        for key in ("file_path", "path", "command", "query", "pattern", "content"):
+            if key in inp:
+                preview = str(inp[key])[:120]
+                break
+        if not preview and inp:
+            preview = str(next(iter(inp.values())))[:120]
+        display = f"[→ {name}] {preview}" if preview else f"[→ {name}]"
+
+    elif t == "tool_result":
+        content = ev.get("content", [])
+        if isinstance(content, list):
+            parts = [b.get("text", "") for b in content if b.get("type") == "text"]
+            text = "\n".join(p for p in parts if p)
+        elif isinstance(content, str):
+            text = content
+        else:
+            text = ""
+        if text.strip():
+            first_line = text.strip().split("\n")[0][:120]
+            display = f"[✓] {first_line}"
+
+    elif t == "result":
+        cost_usd = ev.get("cost_usd") or ev.get("total_cost_usd")
+        result_text = ev.get("result", "").strip()
+        subtype = ev.get("subtype", "")
+        if subtype == "error_during_execution":
+            display = f"[error] {result_text[:300]}" if result_text else "[error]"
+        elif result_text:
+            display = f"[resultado] {result_text[:300]}"
+
+    # For unknown types just skip display
+
+    return display, session_id, cost_usd
+
+
+def _run(task_id: str, project_path: str = ""):
     task = task_store.get(task_id)
     if not task:
         return
@@ -71,6 +141,10 @@ def _run(task_id: str):
     cwd = str(Path.home())
     _emit(task, task_id, f"[loopgate] cwd={cwd}")
     _emit(task, task_id, f"[loopgate] cmd={task.command}")
+
+    collected_session_id: str | None = None
+    collected_cost: float | None = None
+    collected_result: str | None = None
 
     try:
         process = subprocess.Popen(
@@ -92,7 +166,23 @@ def _run(task_id: str):
         stderr_thread.start()
 
         for raw_line in iter(process.stdout.readline, ""):
-            _emit(task, task_id, raw_line.rstrip())
+            line = raw_line.rstrip()
+            if not line:
+                continue
+            display, sid, cost = _parse_stream_event(line)
+            if sid:
+                collected_session_id = sid
+            if cost is not None:
+                collected_cost = cost
+            # Capture result text from "result" events
+            try:
+                ev = json.loads(line)
+                if ev.get("type") == "result":
+                    collected_result = ev.get("result", "").strip() or None
+            except (json.JSONDecodeError, ValueError):
+                pass
+            if display:
+                _emit(task, task_id, display)
 
         process.wait()
         stderr_thread.join(timeout=5)
@@ -105,13 +195,29 @@ def _run(task_id: str):
         task.status = TaskStatus.ERROR
         task.exit_code = -1
 
+    # Persist structured output fields
+    if collected_session_id:
+        task.claude_session_id = collected_session_id
+        if project_path:
+            session_store.set(project_path, collected_session_id)
+            manager.broadcast_sync({
+                "type": "session_updated",
+                "project_path": project_path,
+                "session_id": collected_session_id,
+            })
+    if collected_result:
+        task.claude_result = collected_result
+    if collected_cost is not None:
+        task.claude_cost_usd = collected_cost
+
     task.finished_at = _now()
-    _emit(task, task_id, f"[loopgate] exit={task.exit_code} status={task.status}")
+    cost_str = f" cost=${collected_cost:.4f}" if collected_cost else ""
+    _emit(task, task_id, f"[loopgate] exit={task.exit_code} status={task.status}{cost_str}")
     task_store.update(task)
     manager.broadcast_sync({"type": "task_updated", "task": task.model_dump()})
 
 
-def run_task(task: Task):
+def run_task(task: Task, project_path: str = ""):
     """Kick off task execution in a background thread."""
-    thread = threading.Thread(target=_run, args=(task.id,), daemon=True)
+    thread = threading.Thread(target=_run, args=(task.id, project_path), daemon=True)
     thread.start()

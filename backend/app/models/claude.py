@@ -21,6 +21,7 @@ _DANGEROUS = re.compile(r'[`$!]|&&|\|\|')
 class CreateClaudePromptRequest(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=2000)
     project_path: str = Field("", max_length=512)
+    new_session: bool = Field(False)
 
     @field_validator("prompt")
     @classmethod
@@ -51,14 +52,24 @@ def _validate_project_path(project_path: str, projects_root: str) -> Path | None
     return target
 
 
-def build_claude_command(prompt: str, project_path: str, projects_root: str) -> str:
-    """Construct a safe claude --dangerously-skip-permissions -p '...' command."""
+def build_claude_command(
+    prompt: str,
+    project_path: str,
+    projects_root: str,
+    session_id: str | None = None,
+) -> str:
+    """Construct a safe claude --output-format stream-json -p '...' command."""
     safe_path = _validate_project_path(project_path, projects_root)
 
     # Escape double-quotes inside the prompt (works for both cmd.exe + POSIX sh)
     escaped = prompt.replace("\\", "\\\\").replace('"', '\\"')
 
-    claude_cmd = f'claude --dangerously-skip-permissions -p "{escaped}"'
+    flags = "--output-format stream-json --dangerously-skip-permissions"
+    if session_id:
+        safe_sid = session_id.replace('"', "")
+        flags += f' --resume "{safe_sid}"'
+
+    claude_cmd = f'claude {flags} -p "{escaped}"'
 
     if safe_path is None:
         return claude_cmd

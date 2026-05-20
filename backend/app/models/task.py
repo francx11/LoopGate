@@ -31,6 +31,9 @@ class Task(BaseModel):
     exit_code: Optional[int] = None
     reject_reason: Optional[str] = None
     log: List[LogLine] = []
+    claude_session_id: Optional[str] = None
+    claude_result: Optional[str] = None
+    claude_cost_usd: Optional[float] = None
 
 
 # ── Request/Response schemas ──────────────────────────────────────────────────

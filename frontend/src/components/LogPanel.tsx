@@ -13,6 +13,8 @@ export default function LogPanel({ taskId, onClose }: { taskId: string; onClose:
 
   if (!task) return null
 
+  const isDone = ['done', 'error', 'rejected'].includes(task.status)
+
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
@@ -29,7 +31,7 @@ export default function LogPanel({ taskId, onClose }: { taskId: string; onClose:
             {task.status === 'pending_approval' && '⏳ Esperando aprobación...'}
             {task.status === 'queued' && '🔵 En cola, iniciando...'}
             {task.status === 'running' && '⚡ Ejecutando...'}
-            {['done', 'error', 'rejected'].includes(task.status) &&
+            {isDone &&
             `Sin output${task.exit_code !== null ? ` (exit ${task.exit_code})` : ''}`}
           </div>
         ) : (
@@ -42,6 +44,28 @@ export default function LogPanel({ taskId, onClose }: { taskId: string; onClose:
             </div>
           ))
         )}
+
+        {isDone && task.claude_result && (
+          <div className={styles.resultCard}>
+            <div className={styles.resultTitle}>Resultado de Claude</div>
+            <div className={styles.resultText}>{task.claude_result}</div>
+            <div className={styles.resultMeta}>
+              {task.claude_cost_usd != null && (
+                <div className={styles.resultMetaItem}>
+                  <span className={styles.resultMetaLabel}>Costo</span>
+                  <span className={styles.resultMetaValue}>${task.claude_cost_usd.toFixed(4)}</span>
+                </div>
+              )}
+              {task.claude_session_id && (
+                <div className={styles.resultMetaItem}>
+                  <span className={styles.resultMetaLabel}>Sesión</span>
+                  <span className={styles.resultMetaValue}>{task.claude_session_id.slice(0, 16)}…</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div ref={bottomRef} />
       </div>
     </div>

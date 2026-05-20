@@ -69,3 +69,58 @@
 .line { padding: 1px 0; }
 .time { color: var(--muted); margin-right: 10px; }
 .errText { color: var(--red); }
+
+.resultCard {
+  margin: 16px 0 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid #7c3aed;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.resultTitle {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #a78bfa;
+  margin-bottom: 8px;
+}
+
+.resultText {
+  color: var(--text);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.resultMeta {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+
+.resultMetaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.resultMetaLabel {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+
+.resultMetaValue {
+  color: #a78bfa;
+}

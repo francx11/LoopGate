@@ -8,7 +8,7 @@ const RECONNECT_MAX = 30_000
 const AUTH_FAIL_THRESHOLD = 3  // consecutive fast-fail closes before giving up
 
 export function useWebSocket() {
-  const { config, setConnected, setWs, setTasks, upsertTask, appendLog, deleteTask, disconnect } = useStore()
+  const { config, setConnected, setWs, setTasks, upsertTask, appendLog, deleteTask, upsertSession, deleteSession, disconnect } = useStore()
 
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const heartbeatTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -88,6 +88,8 @@ export function useWebSocket() {
         else if (msg.type === 'task_updated') upsertTask(msg.task)
         else if (msg.type === 'task_log') appendLog(msg.task_id, msg.line)
         else if (msg.type === 'task_deleted') deleteTask(msg.task_id)
+        else if (msg.type === 'session_updated') upsertSession(msg.project_path, msg.session_id)
+        else if (msg.type === 'session_deleted') deleteSession(msg.project_path)
       }
 
       socket.onclose = () => {
@@ -120,5 +122,5 @@ export function useWebSocket() {
       if (pongTimer.current) { clearTimeout(pongTimer.current); pongTimer.current = null }
       currentSocket?.close()
     }
-  }, [config, setConnected, setWs, setTasks, upsertTask, appendLog, deleteTask, disconnect])
+  }, [config, setConnected, setWs, setTasks, upsertTask, appendLog, deleteTask, upsertSession, deleteSession, disconnect])
 }

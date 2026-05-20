@@ -25,6 +25,9 @@ export interface Task {
   exit_code: number | null
   reject_reason: string | null
   log: LogLine[]
+  claude_session_id: string | null
+  claude_result: string | null
+  claude_cost_usd: number | null
 }
 
 interface Config {
@@ -42,6 +45,9 @@ interface AppState {
   // Tasks
   tasks: Record<string, Task>
 
+  // Sessions: project_path → session_id
+  sessions: Record<string, string>
+
   // Actions
   setConfig: (config: Config) => void
   setConnected: (v: boolean) => void
@@ -50,6 +56,9 @@ interface AppState {
   upsertTask: (task: Task) => void
   appendLog: (taskId: string, line: LogLine) => void
   deleteTask: (taskId: string) => void
+  setSessions: (sessions: Record<string, string>) => void
+  upsertSession: (projectPath: string, sessionId: string) => void
+  deleteSession: (projectPath: string) => void
   disconnect: () => void
 }
 
@@ -58,6 +67,7 @@ export const useStore = create<AppState>((set, get) => ({
   connected: false,
   ws: null,
   tasks: {},
+  sessions: {},
 
   setConfig: (config) => set({ config }),
   setConnected: (connected) => set({ connected }),
@@ -91,8 +101,20 @@ export const useStore = create<AppState>((set, get) => ({
       return { tasks: next }
     }),
 
+  setSessions: (sessions) => set({ sessions }),
+
+  upsertSession: (projectPath, sessionId) =>
+    set((s) => ({ sessions: { ...s.sessions, [projectPath]: sessionId } })),
+
+  deleteSession: (projectPath) =>
+    set((s) => {
+      const next = { ...s.sessions }
+      delete next[projectPath]
+      return { sessions: next }
+    }),
+
   disconnect: () => {
     get().ws?.close()
-    set({ config: null, connected: false, ws: null, tasks: {} })
+    set({ config: null, connected: false, ws: null, tasks: {}, sessions: {} })
   },
 }))
