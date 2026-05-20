@@ -98,7 +98,7 @@
 
 .btn {
   width: 100%;
-  background: var(--accent);
+  background: #7c3aed;
   color: #fff;
   border: none;
   border-radius: 14px;
@@ -108,11 +108,11 @@
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s;
-  box-shadow: 0 4px 24px rgba(124,106,247,0.4);
+  box-shadow: 0 4px 24px rgba(124,58,237,0.4);
   margin-top: 14px;
   min-height: 52px;
 }
-.btn:hover { background: #8f7fff; }
+.btn:hover { background: #6d28d9; }
 .btn:active { transform: scale(0.97); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 

@@ -13,11 +13,12 @@ def _default_projects_root() -> str:
 
 
 class Settings(BaseSettings):
-    PORT: int = 8000
+    PORT: int = 8001
     HOST: str = "0.0.0.0"
     SECRET_TOKEN: str = ""
     CORS_ORIGINS: List[str] = []
     LOG_LEVEL: str = "info"
+    DEBUG: bool = False
     PROJECTS_ROOT: str = _default_projects_root()
     STORE_BACKEND: str = "memory"  # "memory" | "sqlite"
     SQLITE_PATH: str = "loopgate.db"

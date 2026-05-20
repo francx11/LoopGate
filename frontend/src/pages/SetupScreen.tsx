@@ -4,7 +4,7 @@ import styles from './SetupScreen.module.css'
 
 export default function SetupScreen() {
   const { setConfig } = useStore()
-  const [apiUrl, setApiUrl] = useState(localStorage.getItem('lg-api') ?? '')
+  const [apiUrl, setApiUrl] = useState(localStorage.getItem('lg-api') ?? window.location.origin)
   const [wsUrl, setWsUrl] = useState(localStorage.getItem('lg-ws') ?? '')
   const [token, setToken] = useState(localStorage.getItem('lg-token') ?? '')
   const [error, setError] = useState('')

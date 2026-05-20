@@ -21,13 +21,22 @@ export default function App() {
         if (data.auth_required && !token) return  // show SetupScreen to enter token
         const origin = window.location.origin
         const wsOrigin = origin.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://')
+        // If running on Vite dev server (:5173), WS must go directly to the
+        // backend port (:8000) — Vite's WS proxy is unreliable in practice.
+        const isDev = window.location.port === '5173'
+        const wsBase = isDev ? wsOrigin.replace(':5173', ':8001') : wsOrigin
+        const freshWs = `${wsBase}/ws`
+        // In dev (:5173) always use current origin so API calls go through
+        // Vite proxy — a stale localStorage value pointing at :8000 would
+        // cause cross-origin requests that CORS blocks.
+        const freshApi = isDev ? origin : (api ?? origin)
         const cfg = {
-          apiUrl: api ?? origin,
-          wsUrl: ws ?? `${wsOrigin}/ws`,
+          apiUrl: freshApi,
+          wsUrl: freshWs,
           token,
         }
-        if (!api) localStorage.setItem('lg-api', cfg.apiUrl)
-        if (!ws) localStorage.setItem('lg-ws', cfg.wsUrl)
+        localStorage.setItem('lg-api', freshApi)
+        localStorage.setItem('lg-ws', freshWs)
         setConfig(cfg)
       })
       .catch(() => {})

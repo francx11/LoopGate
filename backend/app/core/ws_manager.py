@@ -35,7 +35,7 @@ class ConnectionManager:
         dead: Set[WebSocket] = set()
         for client in list(self._clients):
             try:
-                await client.send_text(message)
+                await asyncio.wait_for(client.send_text(message), timeout=5.0)
             except Exception:
                 dead.add(client)
         for client in dead:
