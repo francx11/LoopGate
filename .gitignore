@@ -25,3 +25,6 @@ Thumbs.db
 
 # ngrok
 .ngrok/
+
+# Claude Code local settings (ephemeral permissions, machine-specific)
+.claude/settings.local.json
