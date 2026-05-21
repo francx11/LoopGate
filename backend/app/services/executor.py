@@ -158,9 +158,16 @@ def _run(task_id: str, project_path: str = ""):
             env=_build_env(),
         )
 
+        is_claude_cmd = "--output-format stream-json" in task.command
+        stderr_buffer: list[str] = []
+
         def _drain_stderr():
             for raw in iter(process.stderr.readline, ""):
-                _emit(task, task_id, f"[stderr] {raw.rstrip()}")
+                line = raw.rstrip()
+                if line:
+                    stderr_buffer.append(line)
+                    if not is_claude_cmd:
+                        _emit(task, task_id, f"[stderr] {line}")
 
         stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
         stderr_thread.start()
@@ -188,6 +195,10 @@ def _run(task_id: str, project_path: str = ""):
         stderr_thread.join(timeout=5)
         task.exit_code = process.returncode
         task.status = TaskStatus.DONE if process.returncode == 0 else TaskStatus.ERROR
+
+        if is_claude_cmd and process.returncode != 0 and stderr_buffer:
+            for line in stderr_buffer:
+                _emit(task, task_id, f"[stderr] {line}")
 
     except Exception as exc:
         traceback.print_exc()
