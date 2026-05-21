@@ -64,7 +64,7 @@ def build_claude_command(
     # Escape double-quotes inside the prompt (works for both cmd.exe + POSIX sh)
     escaped = prompt.replace("\\", "\\\\").replace('"', '\\"')
 
-    flags = "--output-format stream-json --dangerously-skip-permissions"
+    flags = "--output-format stream-json --verbose --dangerously-skip-permissions"
     if session_id:
         safe_sid = session_id.replace('"', "")
         flags += f' --resume "{safe_sid}"'

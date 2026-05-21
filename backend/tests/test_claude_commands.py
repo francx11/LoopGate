@@ -9,7 +9,8 @@ from app.models.claude import build_claude_command, CreateClaudePromptRequest
 
 def test_build_no_project_path(tmp_path):
     cmd = build_claude_command("Add tests", "", str(tmp_path))
-    assert 'claude --dangerously-skip-permissions -p "Add tests"' in cmd
+    assert '--output-format stream-json --verbose --dangerously-skip-permissions' in cmd
+    assert '-p "Add tests"' in cmd
     assert "cd" not in cmd
 
 
