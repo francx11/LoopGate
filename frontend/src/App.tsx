@@ -10,7 +10,6 @@ export default function App() {
 
   useEffect(() => {
     const api = localStorage.getItem('lg-api')
-    const ws = localStorage.getItem('lg-ws')
     const token = localStorage.getItem('lg-token') ?? ''
 
     // Always verify the backend first — checks if auth is required so we
@@ -41,7 +40,7 @@ export default function App() {
       })
       .catch(() => {})
       .finally(() => setReady(true))
-  }, [])
+  }, [setConfig])
 
   if (!ready) return (
     <div style={{

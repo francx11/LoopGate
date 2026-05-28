@@ -20,8 +20,8 @@ export default function NewTaskForm({ onCreated }: { onCreated: () => void }) {
       await api.createTask({ name, command, description })
       setName(''); setCommand(''); setDescription('')
       onCreated()
-    } catch (e: any) {
-      setError(e.message ?? 'Error al crear la tarea')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al crear la tarea')
     }
     setLoading(false)
   }

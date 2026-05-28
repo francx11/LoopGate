@@ -1,4 +1,4 @@
-import { useStore } from '../store'
+import { useStore, Task } from '../store'
 
 function getBase() {
   return useStore.getState().config?.apiUrl ?? ''
@@ -37,23 +37,23 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = {
   getProjects: () => request<{ name: string; path: string }[]>('GET', '/projects'),
 
-  getTasks: () => request<any[]>('GET', '/tasks'),
+  getTasks: () => request<Task[]>('GET', '/tasks'),
 
   createTask: (data: { name: string; command: string; description?: string }) =>
-    request<any>('POST', '/tasks', data),
+    request<Task>('POST', '/tasks', data),
 
   createClaudePrompt: (data: { prompt: string; project_path: string; new_session?: boolean }) =>
-    request<any>('POST', '/tasks/claude-prompt', data),
+    request<Task>('POST', '/tasks/claude-prompt', data),
 
   approveTask: (id: string, action: 'approve' | 'reject', reason = '') =>
-    request<any>('POST', `/tasks/${id}/approve`, { action, reason }),
+    request<{ ok: boolean; message: string }>('POST', `/tasks/${id}/approve`, { action, reason }),
 
   deleteTask: (id: string) =>
-    request<any>('DELETE', `/tasks/${id}`),
+    request<{ ok: boolean }>('DELETE', `/tasks/${id}`),
 
   getSessions: () =>
     request<Record<string, string>>('GET', '/sessions'),
 
   clearSession: (projectPath: string) =>
-    request<any>('DELETE', `/sessions?project_path=${encodeURIComponent(projectPath)}`),
+    request<{ ok: boolean; deleted: boolean }>('DELETE', `/sessions?project_path=${encodeURIComponent(projectPath)}`),
 }
