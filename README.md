@@ -13,7 +13,7 @@
 
 ## 🧠 What is Loopgate?
 
-Modern AI coding agents like Kiro, Cursor, or custom LLM agents can execute tasks autonomously. But sometimes you need a human to review and approve actions before they run — especially for risky operations like deployments, database migrations, or file deletions.
+Modern AI coding agents like Claude Code, Cursor, or custom LLM agents can execute tasks autonomously. But sometimes you need a human to review and approve actions before they run — especially for risky operations like deployments, database migrations, or file deletions.
 
 **Loopgate** is the bridge: a lightweight server that sits between your AI agent and execution, exposing a mobile-friendly dashboard so you can approve or reject tasks from anywhere in the world.
 
@@ -33,41 +33,50 @@ AI Agent ──► Loopgate Server ──► [ Pending Approval ] ──► Your
 - 📋 **Task queue** — Create tasks with name, description, and command
 - ✅ **Mobile approval flow** — Approve or reject from any device, anywhere
 - ⚡ **Real-time logs** — Stream command output line by line via WebSocket
-- 🌐 **Remote access** — Works over the internet via ngrok tunnel
+- 🤖 **Claude Code integration** — Submit natural-language prompts; Loopgate builds the command, tracks sessions, and streams output
+- 🔄 **Session continuity** — Claude Code sessions persist across tasks per project path
+- 🌐 **Remote access** — Works over the network via Tailscale or ngrok
 - 🔌 **REST + WebSocket API** — Integrate with any AI agent or automation tool
 - 🪟 **Cross-platform** — Works on macOS, Linux, and Windows 10+
-- 🔒 **Optional auth token** — Protect your server with a secret token
+- 🔒 **Auth token + rate limiting** — Protect your server; docs hidden when token is active
+- 🛡️ **Security headers** — CSP, X-Frame-Options, HSTS (on HTTPS), and more
 
 ---
 
 ## 🏗️ Architecture
 
+Single-port design: the React frontend is compiled into `frontend/dist/` and served by FastAPI on the same port as the REST and WebSocket APIs.
+
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     Loopgate Server (PC)                 │
-│                                                          │
-│  ┌──────────────┐    ┌──────────────┐                   │
-│  │  FastAPI     │    │  WebSocket   │                   │
-│  │  REST API    │    │  Server      │                   │
-│  │  :8000       │    │  :8765       │                   │
-│  └──────┬───────┘    └──────┬───────┘                   │
-│         │                   │                            │
-│  ┌──────▼───────────────────▼──────┐                    │
-│  │         In-memory Task Store    │                    │
-│  └─────────────────────────────────┘                    │
-└──────────────────────┬──────────────────────────────────┘
-                       │ ngrok tunnel
-                       │
-              ┌────────▼────────┐
-              │   Public URL    │
-              │ https://xxx.    │
-              │ ngrok-free.app  │
-              └────────┬────────┘
-                       │
-              ┌────────▼────────┐
-              │  Mobile React   │
-              │  Dashboard      │
-              └─────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                    Loopgate Server (PC)                   │
+│                                                           │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │  FastAPI :8001                                       │ │
+│  │  ├── GET/POST/DELETE  /api/v1/tasks                  │ │
+│  │  ├── GET              /api/v1/projects               │ │
+│  │  ├── GET/DELETE       /api/v1/sessions               │ │
+│  │  ├── WS               /ws  (real-time events)        │ │
+│  │  ├── GET              /health                        │ │
+│  │  └── *                /  (React SPA)                 │ │
+│  └────────────────────┬────────────────────────────────┘ │
+│                        │                                  │
+│  ┌─────────────────────▼────────────────────────────────┐ │
+│  │  TaskStore (in-memory, thread-safe)                  │ │
+│  │  SessionStore (project → Claude session ID)          │ │
+│  └─────────────────────┬────────────────────────────────┘ │
+│                        │                                  │
+│  ┌─────────────────────▼────────────────────────────────┐ │
+│  │  TaskExecutor (background thread)                    │ │
+│  │  subprocess.Popen → streams stdout/stderr to WS      │ │
+│  └──────────────────────────────────────────────────────┘ │
+└──────────────────────────┬───────────────────────────────┘
+                           │ Tailscale / ngrok
+                           │
+                  ┌────────▼────────┐
+                  │  Mobile React   │
+                  │  Dashboard      │
+                  └─────────────────┘
 ```
 
 ---
@@ -80,39 +89,39 @@ AI Agent ──► Loopgate Server ──► [ Pending Approval ] ──► Your
 - Node.js 20+
 - [Tailscale](https://tailscale.com) (recommended) or [ngrok](https://ngrok.com)
 
-### 1. Clone the repo
+### Windows — one-shot launch
 
-```bash
-git clone https://github.com/YOUR_USERNAME/loopgate.git
-cd loopgate
+```bat
+./start.bat
 ```
 
-### 2. Start the backend
+Builds the frontend, starts the backend, and prints the access URL (Tailscale IP or ngrok tunnel).
+
+### Manual setup
 
 ```bash
+# Backend
 cd backend
 python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+venv\Scripts\activate        # macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-python run.py
+python run.py                # starts on :8001
 ```
 
-### 3. Access from your phone
+### Access from your phone
 
-**Option A — Tailscale (recommended):**
-Install Tailscale on both your PC and phone. Join the same account.
-Open `http://<tailscale-ip>:8000` on your phone — the app auto-connects.
+**Option A — Tailscale (recommended):**  
+Install Tailscale on both your PC and phone. Join the same account.  
+Open `http://<tailscale-ip>:8001` on your phone — the app auto-connects.
 
 **Option B — ngrok:**
 ```bash
-ngrok http 8000
+ngrok http 8001
 ```
-Open the `https://xxx.ngrok-free.app` URL on your phone and enter it in the
-setup screen.
+Open the `https://xxx.ngrok-free.app` URL on your phone.
 
-> The frontend is compiled into `frontend/dist/` and served by FastAPI on the
-> same port (:8000). No separate dev server needed in production.
+> The frontend is compiled into `frontend/dist/` and served by FastAPI on the same port. No separate server needed in production.
 
 ---
 
@@ -122,7 +131,7 @@ setup screen.
 
 ```bash
 # Create a task (it will wait for your approval on mobile)
-curl -X POST https://YOUR-NGROK-URL/api/v1/tasks \
+curl -X POST http://YOUR-HOST:8001/api/v1/tasks \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Deploy to production",
@@ -141,7 +150,7 @@ Now pick up your phone, open Loopgate, and tap ✅ Approve or 🚫 Reject.
 ```python
 import requests, time
 
-LOOPGATE = "https://YOUR-NGROK-URL"
+LOOPGATE = "http://YOUR-HOST:8001"
 
 def run_with_approval(name: str, command: str) -> bool:
     """Submit a task and block until it completes or is rejected."""
@@ -161,7 +170,6 @@ def run_with_approval(name: str, command: str) -> bool:
             return False
         time.sleep(2)
 
-# Usage
 success = run_with_approval(
     name="Database migration",
     command="python manage.py migrate"
@@ -173,19 +181,22 @@ print("✅ Done" if success else "❌ Failed or rejected")
 
 ## 📡 API Reference
 
-Full interactive docs available at `http://localhost:8000/docs` when the server is running.
+Full interactive docs available at `http://localhost:8001/docs` when the server is running (hidden when `SECRET_TOKEN` is set).
 
 ### Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/health` | Server health + `auth_required` flag |
 | `GET` | `/api/v1/tasks` | List all tasks |
 | `GET` | `/api/v1/tasks/{id}` | Get task details + log |
-| `POST` | `/api/v1/tasks` | Create a new task |
+| `POST` | `/api/v1/tasks` | Create a task |
 | `POST` | `/api/v1/tasks/{id}/approve` | Approve or reject a task |
 | `DELETE` | `/api/v1/tasks/{id}` | Delete a task |
-| `GET` | `/health` | Server health + `auth_required` flag |
-| `POST` | `/api/v1/tasks/claude-prompt` | Create Claude Code task from natural-language prompt |
+| `POST` | `/api/v1/tasks/claude-prompt` | Create a Claude Code task from a natural-language prompt |
+| `GET` | `/api/v1/projects` | List directories inside `PROJECTS_ROOT` |
+| `GET` | `/api/v1/sessions` | List active Claude Code sessions |
+| `DELETE` | `/api/v1/sessions?project_path=...` | Clear a Claude session by project path |
 
 ### POST /api/v1/tasks
 
@@ -206,9 +217,23 @@ Full interactive docs available at `http://localhost:8000/docs` when the server 
 }
 ```
 
+### POST /api/v1/tasks/claude-prompt
+
+Builds a `claude --output-format stream-json` command server-side and queues it for approval.
+
+```json
+{
+  "prompt": "string (1–2000 chars, no shell metacharacters)",
+  "project_path": "string (optional, must be inside PROJECTS_ROOT)",
+  "new_session": false
+}
+```
+
+When `new_session` is `false` (default), an existing session for `project_path` is resumed automatically.
+
 ### WebSocket Events
 
-Connect to `ws://HOST:8000/ws` (same port as REST API)
+Connect to `ws://HOST:8001/ws`
 
 | Event | Direction | Payload |
 |-------|-----------|---------|
@@ -217,6 +242,7 @@ Connect to `ws://HOST:8000/ws` (same port as REST API)
 | `task_updated` | server → client | `{ task: Task }` |
 | `task_log` | server → client | `{ task_id, line: { time, text } }` |
 | `task_deleted` | server → client | `{ task_id }` |
+| `session_deleted` | server → client | `{ project_path }` |
 
 ### Task object
 
@@ -238,13 +264,27 @@ Connect to `ws://HOST:8000/ws` (same port as REST API)
 
 ---
 
+## ⚙️ Configuration
+
+All settings can be set via environment variables or a `.env` file in the `backend/` directory.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8001` | Port the server listens on |
+| `HOST` | `0.0.0.0` | Bind address |
+| `SECRET_TOKEN` | _(empty)_ | Bearer token required on all API requests when set |
+| `CORS_ORIGINS` | _(empty)_ | Comma-separated allowed origins (empty = allow all) |
+| `PROJECTS_ROOT` | `~/Documents/Projects` (Win) / `~/projects` | Root for project discovery |
+| `LOG_LEVEL` | `info` | Uvicorn log level |
+
+---
+
 ## 🗺️ Roadmap
 
 - [ ] Persistent storage (SQLite)
 - [ ] Push notifications (mobile)
 - [ ] Authentication (JWT)
 - [ ] Task scheduling / cron
-- [ ] Kiro native plugin
 - [ ] Slack / Telegram bot integration
 - [ ] Task templates
 - [ ] Multi-user support
@@ -261,6 +301,9 @@ cd backend && pytest
 
 # Run frontend in dev mode
 cd frontend && npm run dev
+
+# Production build
+cd frontend && npm run build
 ```
 
 ---
