@@ -2,15 +2,14 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from typing import Dict, List
 
 from app.core.auth import verify_token
 from app.core.config import settings
-from app.core.store import task_store, session_store
-from app.core.ws_manager import manager
 from app.core.limiter import limiter
-from app.models.task import Task, TaskStatus, CreateTaskRequest, ApproveTaskRequest
+from app.core.store import session_store, task_store
+from app.core.ws_manager import manager
 from app.models.claude import CreateClaudePromptRequest, build_claude_command
+from app.models.task import ApproveTaskRequest, CreateTaskRequest, Task, TaskStatus
 from app.services.executor import run_task
 
 router = APIRouter(tags=["tasks"], dependencies=[Depends(verify_token)])
@@ -31,7 +30,7 @@ def list_projects(request: Request):
     ]
 
 
-@router.get("/tasks", response_model=List[Task], summary="List all tasks")
+@router.get("/tasks", response_model=list[Task], summary="List all tasks")
 @limiter.limit("120/minute")
 def list_tasks(request: Request):
     return task_store.all()
@@ -137,7 +136,7 @@ async def delete_task(request: Request, task_id: str):
 
 # ── Session endpoints ─────────────────────────────────────────────────────────
 
-@router.get("/sessions", response_model=Dict[str, str], summary="List active Claude sessions")
+@router.get("/sessions", response_model=dict[str, str], summary="List active Claude sessions")
 @limiter.limit("60/minute")
 def list_sessions(request: Request):
     return session_store.all()
@@ -156,7 +155,9 @@ async def clear_session(request: Request, project_path: str):
 
 def _ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
-    return forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 def _extract_project_path(command: str) -> str:

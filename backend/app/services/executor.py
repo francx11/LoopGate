@@ -11,6 +11,9 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
+from app.core.store import session_store, task_store
+from app.core.ws_manager import manager
+from app.models.task import LogLine, Task, TaskStatus
 
 # Strip known secrets/session vars — pass everything else through intact.
 _SECRET_DENYLIST = {
@@ -42,10 +45,6 @@ def _build_env() -> dict:
             env["PATH"] = os.pathsep.join(additions) + os.pathsep + path
 
     return env
-
-from app.core.store import task_store, session_store
-from app.core.ws_manager import manager
-from app.models.task import Task, TaskStatus, LogLine
 
 
 def _now() -> str:
@@ -147,7 +146,7 @@ def _run(task_id: str, project_path: str = ""):
     collected_result: str | None = None
 
     try:
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # noqa: S602
             task.command,
             shell=True,
             stdin=subprocess.DEVNULL,

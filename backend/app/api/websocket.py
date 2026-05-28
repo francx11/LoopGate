@@ -35,7 +35,7 @@ async def _authenticate(websocket: WebSocket) -> bool:
         msg = json.loads(raw)
         if msg.get("type") == "auth":
             token = msg.get("token", "")
-    except (asyncio.TimeoutError, json.JSONDecodeError, WebSocketDisconnect):
+    except (TimeoutError, json.JSONDecodeError, WebSocketDisconnect):
         token = ""
 
     if is_valid_token(token):
@@ -45,7 +45,7 @@ async def _authenticate(websocket: WebSocket) -> bool:
         await websocket.send_text(
             json.dumps({"type": "auth_error", "reason": "invalid_token"})
         )
-    except Exception:
+    except Exception:  # noqa: S110
         pass
     await websocket.close(code=WS_CLOSE_INVALID_TOKEN, reason="invalid token")
     return False
@@ -71,7 +71,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 msg = json.loads(raw)
                 if msg.get("type") == "ping":
                     await websocket.send_text(json.dumps({"type": "pong"}))
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
     except WebSocketDisconnect:
         pass

@@ -1,11 +1,11 @@
-from enum import Enum
-from typing import List, Optional
-from pydantic import BaseModel, Field
-from datetime import datetime
 import uuid
+from datetime import datetime
+from enum import StrEnum
+
+from pydantic import BaseModel, Field
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     PENDING_APPROVAL = "pending_approval"
     QUEUED           = "queued"
     RUNNING          = "running"
@@ -26,14 +26,14 @@ class Task(BaseModel):
     description: str = ""
     status: TaskStatus = TaskStatus.PENDING_APPROVAL
     created_at: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    started_at: Optional[str] = None
-    finished_at: Optional[str] = None
-    exit_code: Optional[int] = None
-    reject_reason: Optional[str] = None
-    log: List[LogLine] = []
-    claude_session_id: Optional[str] = None
-    claude_result: Optional[str] = None
-    claude_cost_usd: Optional[float] = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    exit_code: int | None = None
+    reject_reason: str | None = None
+    log: list[LogLine] = []
+    claude_session_id: str | None = None
+    claude_result: str | None = None
+    claude_cost_usd: float | None = None
 
 
 # ── Request/Response schemas ──────────────────────────────────────────────────

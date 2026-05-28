@@ -1,10 +1,10 @@
 """Unit tests for server-side Claude command builder."""
 
-import os
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
-from app.models.claude import build_claude_command, CreateClaudePromptRequest
+from app.models.claude import CreateClaudePromptRequest, build_claude_command
 
 
 def test_build_no_project_path(tmp_path):
@@ -35,17 +35,17 @@ def test_build_rejects_nonexistent_path(tmp_path):
 
 
 def test_prompt_validator_blocks_injection():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         CreateClaudePromptRequest(prompt="echo hi && rm -rf /", project_path="")
 
 
 def test_prompt_validator_blocks_backtick():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         CreateClaudePromptRequest(prompt="do `rm -rf /`", project_path="")
 
 
 def test_prompt_validator_blocks_dollar():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         CreateClaudePromptRequest(prompt="value is $(id)", project_path="")
 
 

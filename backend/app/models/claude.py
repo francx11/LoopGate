@@ -42,11 +42,11 @@ def _validate_project_path(project_path: str, projects_root: str) -> Path | None
     target = Path(project_path).resolve()
     try:
         target.relative_to(root)
-    except ValueError:
+    except ValueError as exc:
         raise HTTPException(
             400,
             f"project_path must be inside PROJECTS_ROOT ({root})",
-        )
+        ) from exc
     if not target.exists():
         raise HTTPException(400, f"Project path does not exist: {target}")
     return target

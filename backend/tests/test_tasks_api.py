@@ -1,9 +1,6 @@
 """CRUD + approval flow tests for the /api/v1/tasks endpoints."""
 
-import json
-import pytest
 from fastapi.testclient import TestClient
-
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 

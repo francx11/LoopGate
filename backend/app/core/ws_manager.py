@@ -5,15 +5,14 @@ Handles broadcasting events to all connected FastAPI WebSocket clients.
 
 import asyncio
 import json
-from typing import Optional, Set
 
 from fastapi import WebSocket
 
 
 class ConnectionManager:
     def __init__(self):
-        self._clients: Set[WebSocket] = set()
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._clients: set[WebSocket] = set()
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     def set_loop(self, loop: asyncio.AbstractEventLoop):
         self._loop = loop
@@ -32,7 +31,7 @@ class ConnectionManager:
         if not self._clients:
             return
         message = json.dumps(event)
-        dead: Set[WebSocket] = set()
+        dead: set[WebSocket] = set()
         for client in list(self._clients):
             try:
                 await asyncio.wait_for(client.send_text(message), timeout=5.0)

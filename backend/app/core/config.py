@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
+
 from pydantic_settings import BaseSettings
-from typing import List
 
 
 def _default_projects_root() -> str:
@@ -14,9 +14,9 @@ def _default_projects_root() -> str:
 
 class Settings(BaseSettings):
     PORT: int = 8001
-    HOST: str = "0.0.0.0"
+    HOST: str = "0.0.0.0"  # noqa: S104
     SECRET_TOKEN: str = ""
-    CORS_ORIGINS: List[str] = []
+    CORS_ORIGINS: list[str] = []
     LOG_LEVEL: str = "info"
     DEBUG: bool = False
     PROJECTS_ROOT: str = _default_projects_root()

@@ -7,10 +7,8 @@ Select via STORE_BACKEND env var ("memory" or "sqlite").
 The public interface (add/get/update/delete/all) is identical for both.
 """
 
-import json
 import sqlite3
 import threading
-from typing import Dict, List, Optional
 
 from app.core.config import settings
 from app.models.task import Task
@@ -18,7 +16,7 @@ from app.models.task import Task
 
 class _MemoryStore:
     def __init__(self):
-        self._tasks: Dict[str, Task] = {}
+        self._tasks: dict[str, Task] = {}
         self._lock = threading.Lock()
 
     def add(self, task: Task) -> Task:
@@ -26,7 +24,7 @@ class _MemoryStore:
             self._tasks[task.id] = task
         return task
 
-    def get(self, task_id: str) -> Optional[Task]:
+    def get(self, task_id: str) -> Task | None:
         return self._tasks.get(task_id)
 
     def update(self, task: Task) -> Task:
@@ -41,7 +39,7 @@ class _MemoryStore:
                 return True
         return False
 
-    def all(self) -> List[Task]:
+    def all(self) -> list[Task]:
         return list(self._tasks.values())
 
 
@@ -79,7 +77,7 @@ class _SQLiteStore:
                 conn.commit()
         return task
 
-    def get(self, task_id: str) -> Optional[Task]:
+    def get(self, task_id: str) -> Task | None:
         with self._conn() as conn:
             row = conn.execute(
                 "SELECT data FROM tasks WHERE id = ?", (task_id,)
@@ -105,7 +103,7 @@ class _SQLiteStore:
                 conn.commit()
         return changed > 0
 
-    def all(self) -> List[Task]:
+    def all(self) -> list[Task]:
         with self._conn() as conn:
             rows = conn.execute("SELECT data FROM tasks").fetchall()
         return [self._row_to_task(r) for r in rows]
@@ -126,14 +124,14 @@ class SessionStore:
     """Maps project_path → claude session_id (in-memory only)."""
 
     def __init__(self):
-        self._sessions: Dict[str, str] = {}
+        self._sessions: dict[str, str] = {}
         self._lock = threading.Lock()
 
     def set(self, project_path: str, session_id: str) -> None:
         with self._lock:
             self._sessions[project_path] = session_id
 
-    def get(self, project_path: str) -> Optional[str]:
+    def get(self, project_path: str) -> str | None:
         return self._sessions.get(project_path)
 
     def delete(self, project_path: str) -> bool:
@@ -143,7 +141,7 @@ class SessionStore:
                 return True
         return False
 
-    def all(self) -> Dict[str, str]:
+    def all(self) -> dict[str, str]:
         return dict(self._sessions)
 
 
